@@ -8,1171 +8,675 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <!-- FontAwesome para ícones -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        dark: {
+                            base: '#050508',
+                            card: '#09090e',
+                        },
+                        neon: {
+                            pink: '#ff0055',
+                            cyan: '#06b6d4',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Custom CSS styles for scrollbars and animations -->
     <style>
-        :root {
-            --bg-base: #080710;
-            --bg-card: rgba(255, 255, 255, 0.03);
-            --border-card: rgba(255, 255, 255, 0.07);
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0b0;
-            --accent-color: #3b82f6; /* Blue glow */
-            --accent-pink: #ec4899; /* Pink glow */
-            --gold-color: #f59e0b; /* Rating gold */
-            --glass-blur: blur(16px);
-            --gradient-accent: linear-gradient(135deg, #3b82f6 0%, #ec4899 100%);
+        /* Custom scrollbar matching dark premium theme */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+        ::-webkit-scrollbar-track {
+            background: #050508;
         }
-
-        body {
-            background-color: var(--bg-base);
-            color: var(--text-primary);
-            font-family: 'Outfit', sans-serif;
-            overflow-x: hidden;
-            min-height: 100vh;
-        }
-
-        /* Background Aurora Spheres */
-        .aurora-glow {
-            position: fixed;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(0, 0, 0, 0) 70%);
-            top: -200px;
-            left: -200px;
-            z-index: -1;
-            pointer-events: none;
-            animation: floatGlow 15s infinite alternate ease-in-out;
-        }
-
-        .aurora-glow-right {
-            position: fixed;
-            width: 500px;
-            height: 500px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(236, 72, 153, 0.12) 0%, rgba(0, 0, 0, 0) 70%);
-            bottom: -100px;
-            right: -100px;
-            z-index: -1;
-            pointer-events: none;
-            animation: floatGlow 20s infinite alternate-reverse ease-in-out;
-        }
-
-        @keyframes floatGlow {
-            0% { transform: translate(0, 0) scale(1); }
-            100% { transform: translate(100px, 50px) scale(1.1); }
-        }
-
-        /* Navigation Header */
-        header {
-            position: sticky;
-            top: 0;
-            width: 100%;
-            z-index: 100;
-            background: rgba(8, 7, 16, 0.6);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border-bottom: 1px solid var(--border-card);
-        }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 1.25rem 2rem;
-        }
-
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            font-size: 1.4rem;
-            font-weight: 800;
-            letter-spacing: 0.5px;
-            background: var(--gradient-accent);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .logo-area i {
-            -webkit-text-fill-color: #3b82f6;
-        }
-
-        nav {
-            display: flex;
-            gap: 1.5rem;
-        }
-
-        nav a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 0.95rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            position: relative;
-            padding: 0.25rem 0;
-        }
-
-        nav a:hover, nav a.active {
-            color: var(--text-primary);
-        }
-
-        nav a::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--gradient-accent);
-            transition: width 0.3s ease;
-        }
-
-        nav a:hover::after, nav a.active::after {
-            width: 100%;
-        }
-
-        /* Main Container */
-        main {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 3.5rem;
-        }
-
-        /* News Section / Slider */
-        .news-hero {
-            width: 100%;
-            height: 380px;
-            border-radius: 20px;
-            overflow: hidden;
-            position: relative;
-            border: 1px solid var(--border-card);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-        }
-
-        .news-slide {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            transition: opacity 0.8s ease-in-out;
-            display: flex;
-            align-items: flex-end;
-            background-size: cover;
-            background-position: center;
-        }
-
-        .news-slide.active {
-            opacity: 1;
-            z-index: 2;
-        }
-
-        .news-overlay {
-            width: 100%;
-            padding: 3rem 2.5rem;
-            background: linear-gradient(to top, rgba(8, 7, 16, 0.95) 0%, rgba(8, 7, 16, 0.4) 60%, rgba(0, 0, 0, 0) 100%);
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .news-tag {
-            background: var(--gradient-accent);
-            padding: 0.35rem 0.85rem;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            width: fit-content;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .news-title {
-            font-size: 2.2rem;
-            font-weight: 800;
-            line-height: 1.25;
-            max-width: 800px;
-        }
-
-        .news-desc {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            max-width: 650px;
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .news-controls {
-            position: absolute;
-            bottom: 1.5rem;
-            right: 2rem;
-            z-index: 10;
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .control-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .control-dot.active {
-            background: #ffffff;
-            width: 25px;
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 10px;
         }
-
-        /* Hub Section Header */
-        .hub-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            padding-bottom: 1.5rem;
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
-
-        .hub-title {
-            font-size: 1.8rem;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+        body {
+            background-color: #050508;
+            overflow-x: hidden;
         }
-
-        .hub-title i {
-            color: #3b82f6;
-        }
-
-        .championship-selector {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-card);
-            padding: 0.75rem 1.5rem;
-            border-radius: 12px;
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 1rem;
-            font-weight: 600;
-            outline: none;
-            cursor: pointer;
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            transition: all 0.3s ease;
-        }
-
-        .championship-selector:hover {
-            border-color: rgba(255, 255, 255, 0.15);
-            background: rgba(255, 255, 255, 0.07);
-        }
-
-        /* Grid Layout */
-        .hub-grid {
-            display: grid;
-            grid-template-columns: 1.5fr 1fr;
-            gap: 2rem;
-        }
-
-        @media (max-width: 900px) {
-            .hub-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        /* Glass Cards */
-        .glass-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-card);
-            border-radius: 20px;
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            padding: 2rem;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-            padding-bottom: 1rem;
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-title i {
-            color: var(--accent-pink);
-        }
-
-        /* Leaderboard Table / Rankings */
-        .leader-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .leader-table th {
-            text-align: left;
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 0.75rem 0.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-        }
-
-        .leader-table td {
-            padding: 1rem 0.5rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
-            font-size: 0.95rem;
-        }
-
-        .leader-table tr:last-child td {
-            border-bottom: none;
-        }
-
-        .rank-number {
-            font-weight: 800;
-            font-size: 1.1rem;
-            width: 30px;
-            display: inline-block;
-        }
-
-        .rank-1 { color: #f59e0b; }
-        .rank-2 { color: #d1d5db; }
-        .rank-3 { color: #b45309; }
-
-        .player-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.15rem;
-        }
-
-        .player-name {
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .player-team {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        .stat-value {
-            font-weight: 800;
-            font-size: 1.1rem;
-            text-align: right;
-        }
-
-        .stat-value.goals { color: var(--accent-color); }
-        .stat-value.assists { color: var(--text-primary); }
-        .stat-value.rating { color: var(--gold-color); }
-
-        /* Matches List */
-        .matches-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .match-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(255, 255, 255, 0.015);
-            border: 1px solid rgba(255, 255, 255, 0.03);
-            border-radius: 12px;
-            padding: 1rem 1.25rem;
-            transition: all 0.3s ease;
-        }
-
-        .match-row:hover {
-            background: rgba(255, 255, 255, 0.03);
-            border-color: rgba(255, 255, 255, 0.06);
-            transform: translateY(-2px);
-        }
-
-        .match-info-meta {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            min-width: 90px;
-        }
-
-        .match-round {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--accent-pink);
-            text-transform: uppercase;
-        }
-
-        .match-date {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-
-        .teams-area {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1.5rem;
-            flex: 1;
-        }
-
-        .team-name {
-            font-weight: 600;
-            font-size: 0.95rem;
-            width: 100px;
-            text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .match-score {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            padding: 0.4rem 1rem;
-            border-radius: 8px;
-            font-size: 1.1rem;
-            font-weight: 800;
-            letter-spacing: 2px;
-            color: var(--accent-color);
-            min-width: 65px;
-            text-align: center;
-        }
-
-        .match-video-btn {
-            color: #ef4444; /* Red for YouTube style */
-            font-size: 1.3rem;
-            text-decoration: none;
-            transition: transform 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-        }
-
-        .match-video-btn:hover {
-            transform: scale(1.2);
-        }
-
-        /* Stats Grid Section */
-        .stats-leaders-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 2rem;
-        }
-
-        /* News Cards Grid */
-        .news-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 2rem;
-        }
-
-        .news-card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-card);
-            border-radius: 20px;
-            overflow: hidden;
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .news-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255,255,255,0.12);
-        }
-
-        .news-card-img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            background: rgba(255,255,255,0.02);
-        }
-
-        .news-card-content {
-            padding: 1.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            flex: 1;
-        }
-
-        .news-card-date {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-        }
-
-        .news-card-title {
-            font-size: 1.2rem;
-            font-weight: 700;
-            line-height: 1.35;
-        }
-
-        .news-card-body {
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
-            display: -webkit-box;
-            -webkit-line-clamp: 4;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-
-        .no-data {
-            text-align: center;
-            padding: 3rem 1rem;
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--border-card);
-            padding: 3rem 2rem;
-            background: rgba(8, 7, 16, 0.8);
-            margin-top: 5rem;
-        }
-
-        .footer-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 2rem;
-        }
-
-        .social-links {
-            display: flex;
-            gap: 1.25rem;
-        }
-
-        .social-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid var(--border-card);
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 1.1rem;
-            transition: all 0.3s ease;
-        }
-
-        .social-btn:hover {
-            color: var(--text-primary);
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: scale(1.08);
-        }
-
-        .social-btn.instagram:hover { color: #e1306c; }
-        .social-btn.youtube:hover { color: #ff0000; }
-        .social-btn.discord:hover { color: #5865f2; }
-        .social-btn.tiktok:hover { color: #010101; }
     </style>
+
+    <!-- React, ReactDOM, Babel Standalone and ESM imports -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body>
-    <div class="aurora-glow"></div>
-    <div class="aurora-glow-right"></div>
+<body class="text-white min-h-screen">
+    <div id="root"></div>
 
-    <!-- Header Navigation -->
-    <header>
-        <div class="nav-container">
-            <div class="logo-area">
-                <i class="fa-solid fa-shield-halved"></i>
-                <span>LIGA VLS</span>
-            </div>
-            <nav>
-                <a href="#" class="active" onclick="scrollToSec('sec-home')">Início</a>
-                <a href="#" onclick="scrollToSec('sec-championship')">Campeonatos</a>
-                <a href="#" onclick="scrollToSec('sec-stats')">Estatísticas</a>
-                <a href="#" onclick="scrollToSec('sec-news')">Notícias</a>
-            </nav>
-        </div>
-    </header>
+    <!-- React Application Code with type="text/babel" and data-type="module" -->
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from 'https://esm.sh/react@18';
+        import ReactDOM from 'https://esm.sh/react-dom@18/client';
+        import { motion, AnimatePresence } from 'https://esm.sh/framer-motion@10';
+        import { 
+            Shield, 
+            Trophy, 
+            Calendar, 
+            Goal, 
+            Award, 
+            Newspaper, 
+            ArrowRight, 
+            Clock, 
+            CheckCircle2, 
+            XCircle, 
+            MinusCircle, 
+            Tv 
+        } from 'https://esm.sh/lucide-react';
 
-    <!-- Main Content -->
-    <main>
-        <!-- Home/Featured News Slider Section -->
-        <section id="sec-home" style="display: flex; flex-direction: column; gap: 1rem;">
-            <div class="news-hero" id="featured-slider">
-                <!-- Slides will be injected dynamically -->
-                <div class="no-data">Carregando portal da Liga VLS...</div>
-            </div>
-        </section>
+        // Animação de Luxo Ease
+        const easeCurve = [0.16, 1, 0.3, 1];
 
-        <!-- Championship Hub (Dropdown + Matches/Standings) -->
-        <section id="sec-championship" style="display: flex; flex-direction: column; gap: 2rem;">
-            <div class="hub-header">
-                <div class="hub-title">
-                    <i class="fa-solid fa-trophy"></i>
-                    <h2>Central do Campeonato</h2>
-                </div>
-                <select id="select-active-championship" class="championship-selector">
-                    <option value="">Selecione um Campeonato</option>
-                </select>
-            </div>
-
-            <div class="hub-grid">
-                <!-- Matches Column -->
-                <div class="glass-card">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fa-solid fa-calendar-days" style="color: #3b82f6;"></i> Confrontos & Placares</span>
-                    </div>
-                    <div class="matches-list" id="match-results-list">
-                        <div class="no-data">Selecione um campeonato para ver os jogos.</div>
-                    </div>
-                </div>
-
-                <!-- Rankings / Leaderboard Grid Column -->
-                <div class="glass-card">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fa-solid fa-ranking-star"></i> Tabela / Classificação</span>
-                    </div>
-                    <div id="standings-board">
-                        <div class="no-data">Selecione um campeonato para visualizar a classificação.</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Stats Leaders Section -->
-        <section id="sec-stats" style="display: flex; flex-direction: column; gap: 2rem;">
-            <div class="hub-header">
-                <div class="hub-title">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <h2>Líderes de Estatísticas</h2>
-                </div>
-            </div>
-
-            <div class="stats-leaders-grid">
-                <!-- Scorers Card -->
-                <div class="glass-card">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fa-solid fa-soccer-ball" style="color: #3b82f6;"></i> Artilharia (Gols)</span>
-                    </div>
-                    <table class="leader-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Jogador</th>
-                                <th style="text-align: right;">Gols</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stats-scorers-list">
-                            <tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Assists Card -->
-                <div class="glass-card">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fa-solid fa-circle-play" style="color: #10b981;"></i> Assistências</span>
-                    </div>
-                    <table class="leader-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Jogador</th>
-                                <th style="text-align: right;">Assists</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stats-assists-list">
-                            <tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Ratings Card -->
-                <div class="glass-card">
-                    <div class="card-header">
-                        <span class="card-title"><i class="fa-solid fa-star" style="color: #f59e0b;"></i> Nota Média</span>
-                    </div>
-                    <table class="leader-table">
-                        <thead>
-                            <tr>
-                                <th>#</th>
-                                <th>Jogador</th>
-                                <th style="text-align: right;">Nota</th>
-                            </tr>
-                        </thead>
-                        <tbody id="stats-ratings-list">
-                            <tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- News Cards Grid Section -->
-        <section id="sec-news" style="display: flex; flex-direction: column; gap: 2rem;">
-            <div class="hub-header">
-                <div class="hub-title">
-                    <i class="fa-solid fa-newspaper" style="color: #ec4899;"></i>
-                    <h2>Mural de Notícias</h2>
-                </div>
-            </div>
-            <div class="news-grid" id="public-news-grid">
-                <div class="no-data">Carregando notícias da liga...</div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Footer -->
-    <footer>
-        <div class="footer-container">
-            <div>
-                <h3 style="font-weight: 800; font-size: 1.25rem;">LIGA VLS</h3>
-                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;">© 2026 Liga VLS. Todos os direitos reservados.</p>
-            </div>
-            <div class="social-links">
-                <a href="https://instagram.com" target="_blank" class="social-btn instagram"><i class="fa-brands fa-instagram"></i></a>
-                <a href="https://youtube.com" target="_blank" class="social-btn youtube"><i class="fa-brands fa-youtube"></i></a>
-                <a href="https://discord.gg" target="_blank" class="social-btn discord"><i class="fa-brands fa-discord"></i></a>
-                <a href="https://tiktok.com" target="_blank" class="social-btn tiktok"><i class="fa-brands fa-tiktok"></i></a>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Dynamic Frontend Logic -->
-    <script>
-        let championships = [];
-        let matches = [];
-        let news = [];
-        let leaguePlayers = [];
-        let activeSlideIndex = 0;
-        let slideInterval = null;
-
-        // Start loading
-        document.addEventListener("DOMContentLoaded", async () => {
-            await fetchChampionships();
-            await fetchNews();
-        });
-
-        function scrollToSec(id) {
-            const el = document.getElementById(id);
-            if (el) {
-                window.scrollTo({
-                    top: el.offsetTop - 100,
-                    behavior: 'smooth'
-                });
-                
-                // Active Class nav
-                document.querySelectorAll("nav a").forEach(a => a.classList.remove("active"));
-                event.target.classList.add("active");
+        // Variants de Animação Framer Motion
+        const containerVariants = {
+            hidden: { opacity: 0 },
+            visible: {
+                opacity: 1,
+                transition: {
+                    staggerChildren: 0.08,
+                    ease: easeCurve
+                }
             }
-        }
+        };
 
-        async function fetchChampionships() {
-            try {
-                const res = await fetch("/api/public/campeonatos");
-                if (res.ok) {
-                    championships = await res.json();
-                    const selector = document.getElementById("select-active-championship");
-                    
-                    selector.innerHTML = '<option value="">Selecione um Campeonato</option>';
-                    championships.forEach(c => {
-                        if (c.ativo) {
-                            selector.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
-                        }
+        const itemVariants = {
+            hidden: { opacity: 0, y: 30, filter: "blur(10px)" },
+            visible: { 
+                opacity: 1, 
+                y: 0, 
+                filter: "blur(0px)",
+                transition: { duration: 0.8, ease: easeCurve }
+            }
+        };
+
+        // ==============================================================================
+        // WEB APP PRINCIPAL
+        // ==============================================================================
+        function App() {
+            const [activeTab, setActiveTab] = useState("championship");
+            const [championships, setChampionships] = useState([]);
+            const [selectedCampId, setSelectedCampId] = useState("");
+            const [matches, setMatches] = useState([]);
+            const [news, setNews] = useState([]);
+            const [leaguePlayers, setLeaguePlayers] = useState([]);
+            const [countdown, setCountdown] = useState({ days: 2, hours: 14, minutes: 32, seconds: 45 });
+
+            // Timer para o countdown regressivo
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setCountdown(prev => {
+                        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
+                        if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
+                        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
+                        if (prev.days > 0) return { ...prev, days: prev.days - 1, hours: 23, minutes: 59, seconds: 59 };
+                        return prev;
                     });
+                }, 1000);
+                return () => clearInterval(interval);
+            }, []);
 
-                    // Auto-select first active championship if available
-                    const activeChamps = championships.filter(c => c.ativo);
-                    if (activeChamps.length > 0) {
-                        selector.value = activeChamps[0].id;
-                        await onChampionshipChange(activeChamps[0].id);
-                    }
+            // Carregamento inicial de campeonatos e notícias
+            useEffect(() => {
+                fetchChampionships();
+                fetchNews();
+            }, []);
 
-                    selector.addEventListener("change", async (e) => {
-                        await onChampionshipChange(e.target.value);
-                    });
-                }
-            } catch (err) {
-                console.error("Erro ao obter campeonatos:", err);
-            }
-        }
-
-        async function onChampionshipChange(campId) {
-            if (!campId) {
-                clearChampionshipDisplays();
-                return;
-            }
-            await fetchMatches(campId);
-            await fetchLeaguePlayers(campId);
-        }
-
-        function clearChampionshipDisplays() {
-            document.getElementById("match-results-list").innerHTML = '<div class="no-data">Selecione um campeonato para ver os jogos.</div>';
-            document.getElementById("standings-board").innerHTML = '<div class="no-data">Selecione um campeonato para visualizar a classificação.</div>';
-            document.getElementById("stats-scorers-list").innerHTML = '<tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>';
-            document.getElementById("stats-assists-list").innerHTML = '<tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>';
-            document.getElementById("stats-ratings-list").innerHTML = '<tr><td colspan="3" class="no-data">Selecione um campeonato acima.</td></tr>';
-        }
-
-        async function fetchMatches(campId) {
-            try {
-                const res = await fetch(`/api/public/partidas?campeonato_id=${campId}`);
-                if (res.ok) {
-                    matches = await res.json();
-                    renderMatches();
-                    renderStandings();
-                }
-            } catch (err) {
-                console.error("Erro ao obter partidas:", err);
-            }
-        }
-
-        async function fetchLeaguePlayers(campId) {
-            try {
-                const res = await fetch(`/api/public/jogadores_liga?campeonato_id=${campId}`);
-                if (res.ok) {
-                    leaguePlayers = await res.json();
-                    renderStats();
-                }
-            } catch (err) {
-                console.error("Erro ao obter jogadores da liga:", err);
-            }
-        }
-
-        async function fetchNews() {
-            try {
-                const res = await fetch("/api/public/noticias");
-                if (res.ok) {
-                    news = await res.json();
-                    renderNews();
-                    renderNewsSlider();
-                }
-            } catch (err) {
-                console.error("Erro ao obter notícias:", err);
-            }
-        }
-
-        function renderMatches() {
-            const list = document.getElementById("match-results-list");
-            if (matches.length === 0) {
-                list.innerHTML = '<div class="no-data">Nenhuma partida agendada ou disputada para este campeonato ainda.</div>';
-                return;
-            }
-
-            list.innerHTML = matches.map(m => {
-                const dateStr = m.data_jogo ? new Date(m.data_jogo).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'}) : 'Agendado';
-                let scoreText = "VS";
-                if (m.gols_casa !== null && m.gols_fora !== null) {
-                    scoreText = `${m.gols_casa} - ${m.gols_fora}`;
-                }
-
-                let videoBtn = '';
-                if (m.video_url) {
-                    videoBtn = `<a href="${m.video_url}" target="_blank" class="match-video-btn" title="Assistir Gravação"><i class="fa-solid fa-circle-play"></i></a>`;
-                }
-
-                return `
-                    <div class="match-row">
-                        <div class="match-info-meta">
-                            <span class="match-round">${m.rodada}</span>
-                            <span class="match-date">${dateStr}</span>
-                        </div>
-                        <div class="teams-area">
-                            <span class="team-name">🏠 ${m.time_casa}</span>
-                            <span class="match-score">${scoreText}</span>
-                            <span class="team-name">🚌 ${m.time_fora}</span>
-                        </div>
-                        ${videoBtn}
-                    </div>
-                `;
-            }).join("");
-        }
-
-        function renderStandings() {
-            const board = document.getElementById("standings-board");
-            
-            // Calcula tabela de pontos com base nos resultados das partidas encerradas
-            const table = {};
-            
-            matches.forEach(m => {
-                if (!m.encerrada || m.gols_casa === null || m.gols_fora === null) return;
-                
-                if (!table[m.time_casa]) table[m.time_casa] = { nome: m.time_casa, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 };
-                if (!table[m.time_fora]) table[m.time_fora] = { nome: m.time_fora, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0 };
-                
-                const tc = table[m.time_casa];
-                const tf = table[m.time_fora];
-                
-                tc.j += 1;
-                tf.j += 1;
-                tc.gp += m.gols_casa;
-                tc.gc += m.gols_fora;
-                tf.gp += m.gols_fora;
-                tf.gc += m.gols_casa;
-                
-                if (m.gols_casa > m.gols_fora) {
-                    tc.v += 1;
-                    tc.pts += 3;
-                    tf.d += 1;
-                } else if (m.gols_casa < m.gols_fora) {
-                    tf.v += 1;
-                    tf.pts += 3;
-                    tc.d += 1;
+            // Busca de dados vinculados ao campeonato selecionado
+            useEffect(() => {
+                if (selectedCampId) {
+                    fetchMatches(selectedCampId);
+                    fetchLeaguePlayers(selectedCampId);
                 } else {
-                    tc.e += 1;
-                    tc.pts += 1;
-                    tf.e += 1;
-                    tf.pts += 1;
+                    setMatches([]);
+                    setLeaguePlayers([]);
                 }
-                
-                tc.sg = tc.gp - tc.gc;
-                tf.sg = tf.gp - tf.gc;
-            });
+            }, [selectedCampId]);
 
-            // Se não houver partidas encerradas para gerar classificação de pontos, mostra aviso
-            const sortedTeams = Object.values(table).sort((a,b) => {
-                if (b.pts !== a.pts) return b.pts - a.pts;
-                if (b.v !== a.v) return b.v - a.v;
-                return b.sg - a.sg;
-            });
+            const fetchChampionships = async () => {
+                try {
+                    const res = await fetch("/api/public/campeonatos");
+                    if (res.ok) {
+                        const data = await res.json();
+                        setChampionships(data);
+                        const active = data.filter(c => c.ativo);
+                        if (active.length > 0) {
+                            setSelectedCampId(active[0].id);
+                        }
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar campeonatos:", err);
+                }
+            };
 
-            if (sortedTeams.length === 0) {
-                board.innerHTML = '<div class="no-data">Os placares dos jogos ainda não foram lançados para gerar a classificação.</div>';
-                return;
-            }
+            const fetchNews = async () => {
+                try {
+                    const res = await fetch("/api/public/noticias");
+                    if (res.ok) {
+                        const data = await res.json();
+                        setNews(data);
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar notícias:", err);
+                }
+            };
 
-            board.innerHTML = `
-                <table class="leader-table">
-                    <thead>
-                        <tr>
-                            <th>Clube</th>
-                            <th style="text-align:center;">J</th>
-                            <th style="text-align:center;">V</th>
-                            <th style="text-align:center;">SG</th>
-                            <th style="text-align:right;">P</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${sortedTeams.map((t, idx) => {
-                            const isPodium = idx < 3 ? `rank-number rank-${idx+1}` : 'rank-number';
-                            return `
-                                <tr>
-                                    <td>
-                                        <span class="${isPodium}">${idx+1}</span>
-                                        <b style="font-size:0.95rem;">${t.nome}</b>
-                                    </td>
-                                    <td style="text-align:center; color:var(--text-secondary);">${t.j}</td>
-                                    <td style="text-align:center; color:var(--text-secondary);">${t.v}</td>
-                                    <td style="text-align:center; color:var(--text-secondary);">${t.sg > 0 ? '+' + t.sg : t.sg}</td>
-                                    <td style="text-align:right; font-weight:800; font-size:1.05rem; color:var(--accent-color);">${t.pts}</td>
-                                </tr>
-                            `;
-                        }).join("")}
-                    </tbody>
-                </table>
-            `;
-        }
+            const fetchMatches = async (campId) => {
+                try {
+                    const res = await fetch(`/api/public/partidas?campeonato_id=${campId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setMatches(data);
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar partidas:", err);
+                }
+            };
 
-        function renderStats() {
-            // 1. Artilharia
-            const scorersBody = document.getElementById("stats-scorers-list");
-            const scorers = [...leaguePlayers].sort((a, b) => b.gols - a.gols).slice(0, 5);
-            if (scorers.length === 0) {
-                scorersBody.innerHTML = '<tr><td colspan="3" class="no-data">Nenhum artilheiro cadastrado.</td></tr>';
-            } else {
-                scorersBody.innerHTML = scorers.map((p, idx) => `
-                    <tr>
-                        <td><span class="rank-number rank-${idx+1}">${idx+1}</span></td>
-                        <td>
-                            <div class="player-info">
-                                <span class="player-name">${p.nome}</span>
-                                <span class="player-team">${p.time}</span>
-                            </div>
-                        </td>
-                        <td class="stat-value goals">${p.gols}</td>
-                    </tr>
-                `).join("");
-            }
+            const fetchLeaguePlayers = async (campId) => {
+                try {
+                    const res = await fetch(`/api/public/jogadores_liga?campeonato_id=${campId}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setLeaguePlayers(data);
+                    }
+                } catch (err) {
+                    console.error("Erro ao carregar artilharia:", err);
+                }
+            };
 
-            // 2. Assistências
-            const assistsBody = document.getElementById("stats-assists-list");
-            const assists = [...leaguePlayers].sort((a, b) => b.assistencias - a.assistencias).slice(0, 5);
-            if (assists.length === 0) {
-                assistsBody.innerHTML = '<tr><td colspan="3" class="no-data">Nenhuma assistência cadastrada.</td></tr>';
-            } else {
-                assistsBody.innerHTML = assists.map((p, idx) => `
-                    <tr>
-                        <td><span class="rank-number rank-${idx+1}">${idx+1}</span></td>
-                        <td>
-                            <div class="player-info">
-                                <span class="player-name">${p.nome}</span>
-                                <span class="player-team">${p.time}</span>
-                            </div>
-                        </td>
-                        <td class="stat-value assists">${p.assistencias}</td>
-                    </tr>
-                `).join("");
-            }
+            // Cálculo dinâmico da tabela de pontuação baseado nas partidas encerradas
+            const calculateStandings = () => {
+                const table = {};
+                matches.forEach(m => {
+                    if (!m.encerrada || m.gols_casa === null || m.gols_fora === null) return;
+                    if (!table[m.time_casa]) table[m.time_casa] = { nome: m.time_casa, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, form: [] };
+                    if (!table[m.time_fora]) table[m.time_fora] = { nome: m.time_fora, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, form: [] };
 
-            // 3. Notas Médias
-            const ratingsBody = document.getElementById("stats-ratings-list");
-            const ratings = [...leaguePlayers].sort((a, b) => b.nota_media - a.nota_media).slice(0, 5);
-            if (ratings.length === 0) {
-                ratingsBody.innerHTML = '<tr><td colspan="3" class="no-data">Nenhuma nota registrada.</td></tr>';
-            } else {
-                ratingsBody.innerHTML = ratings.map((p, idx) => `
-                    <tr>
-                        <td><span class="rank-number rank-${idx+1}">${idx+1}</span></td>
-                        <td>
-                            <div class="player-info">
-                                <span class="player-name">${p.nome}</span>
-                                <span class="player-team">${p.time}</span>
-                            </div>
-                        </td>
-                        <td class="stat-value rating">${p.nota_media.toFixed(2)}</td>
-                    </tr>
-                `).join("");
-            }
-        }
+                    const tc = table[m.time_casa];
+                    const tf = table[m.time_fora];
 
-        function renderNews() {
-            const grid = document.getElementById("public-news-grid");
-            if (news.length === 0) {
-                grid.innerHTML = '<div class="no-data">Nenhuma notícia publicada no mural ainda.</div>';
-                return;
-            }
+                    tc.j += 1;
+                    tf.j += 1;
+                    tc.gp += m.gols_casa;
+                    tc.gc += m.gols_fora;
+                    tf.gp += m.gols_fora;
+                    tf.gc += m.gols_casa;
 
-            // Classifica por data decrescente
-            const sortedNews = [...news].sort((a,b) => new Date(b.data_publicacao) - new Date(a.data_publicacao));
-            grid.innerHTML = sortedNews.map(n => {
-                const cover = n.imagem_url || "https://i.ibb.co/C5B7BBjS/image.png";
-                const dateStr = n.data_publicacao ? new Date(n.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' }) : "";
-                return `
-                    <article class="news-card">
-                        <img src="${cover}" alt="${n.titulo}" class="news-card-img" onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'">
-                        <div class="news-card-content">
-                            <span class="news-card-date"><i class="fa-regular fa-clock"></i> ${dateStr}</span>
-                            <h3 class="news-card-title">${n.titulo}</h3>
-                            <p class="news-card-body">${n.subtitulo || n.conteudo}</p>
-                        </div>
-                    </article>
-                `;
-            }).join("");
-        }
+                    if (m.gols_casa > m.gols_fora) {
+                        tc.v += 1;
+                        tc.pts += 3;
+                        tc.form.push("W");
+                        tf.d += 1;
+                        tf.form.push("L");
+                    } else if (m.gols_casa < m.gols_fora) {
+                        tf.v += 1;
+                        tf.pts += 3;
+                        tf.form.push("W");
+                        tc.d += 1;
+                        tc.form.push("L");
+                    } else {
+                        tc.e += 1;
+                        tc.pts += 1;
+                        tc.form.push("D");
+                        tf.e += 1;
+                        tf.pts += 1;
+                        tf.form.push("D");
+                    }
+                    tc.sg = tc.gp - tc.gc;
+                    tf.sg = tf.gp - tf.gc;
+                });
 
-        function renderNewsSlider() {
-            const slider = document.getElementById("featured-slider");
-            if (news.length === 0) {
-                slider.innerHTML = '<div class="no-data" style="margin: auto;">Seja bem-vindo ao portal da Liga VLS!</div>';
-                return;
-            }
+                return Object.values(table)
+                    .sort((a, b) => {
+                        if (b.pts !== a.pts) return b.pts - a.pts;
+                        if (b.v !== a.v) return b.v - a.v;
+                        return b.sg - a.sg;
+                    })
+                    .map((item, idx) => ({ ...item, rank: idx + 1 }));
+            };
 
-            // Pega as últimas 3 notícias para os slides
-            const slidesData = [...news].sort((a,b) => new Date(b.data_publicacao) - new Date(a.data_publicacao)).slice(0, 3);
-            
-            let sliderHTML = slidesData.map((s, idx) => {
-                const cover = s.imagem_url || "https://i.ibb.co/C5B7BBjS/image.png";
-                const activeClass = idx === 0 ? 'active' : '';
-                return `
-                    <div class="news-slide ${activeClass}" style="background-image: url('${cover}')">
-                        <div class="news-overlay">
-                            <span class="news-tag">DESTAQUE</span>
-                            <h2 class="news-title">${s.titulo}</h2>
-                            <p class="news-desc">${s.subtitulo || s.conteudo}</p>
-                        </div>
+            const standings = calculateStandings();
+
+            // Próximo confronto em destaque
+            const nextMatch = matches.find(m => !m.encerrada) || matches[0];
+
+            return (
+                <div className="relative min-h-screen bg-dark-base text-white overflow-hidden pb-16 z-10">
+                    
+                    {/* 1. AURORA BACKGROUND (Círculos Flutuantes) */}
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+                        <motion.div 
+                            animate={{
+                                x: [0, 60, -40, 0],
+                                y: [0, -50, 70, 0],
+                                scale: [1, 1.1, 0.9, 1]
+                            }}
+                            transition={{
+                                duration: 20,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                            className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-[#ff0055]/10 to-[#d946ef]/5 filter blur-[130px] top-[-10%] left-[-10%]"
+                        />
+                        <motion.div 
+                            animate={{
+                                x: [0, -80, 40, 0],
+                                y: [0, 60, -50, 0],
+                                scale: [1, 0.95, 1.05, 1]
+                            }}
+                            transition={{
+                                duration: 24,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                            className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-br from-[#06b6d4]/10 to-[#14b8a6]/5 filter blur-[150px] bottom-[5%] right-[-10%]"
+                        />
                     </div>
-                `;
-            }).join("");
 
-            // Adiciona bolinhas de controle
-            sliderHTML += '<div class="news-controls">';
-            slidesData.forEach((_, idx) => {
-                const activeClass = idx === 0 ? 'active' : '';
-                sliderHTML += `<div class="control-dot ${activeClass}" onclick="setSlide(${idx})"></div>`;
-            });
-            sliderHTML += '</div>';
+                    {/* 2. HEADER FIXO (Glassmorphism) */}
+                    <header className="sticky top-0 z-50 w-full bg-dark-base/60 backdrop-blur-xl border-b border-white/[0.05]">
+                        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+                            
+                            {/* Logo */}
+                            <div className="flex items-center gap-2 cursor-pointer">
+                                <div className="p-2 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center">
+                                    <Shield className="w-5 h-5 text-neon-pink" />
+                                </div>
+                                <span className="text-lg font-black tracking-wider bg-gradient-to-r from-neon-pink to-neon-cyan bg-clip-text text-transparent">
+                                    LIGA VLS
+                                </span>
+                            </div>
 
-            slider.innerHTML = sliderHTML;
-            activeSlideIndex = 0;
-            
-            // Loop automático de slides
-            if (slideInterval) clearInterval(slideInterval);
-            slideInterval = setInterval(nextSlide, 6000);
+                            {/* Navegação central com pílula de seleção animada */}
+                            <nav className="relative flex items-center gap-1 bg-white/[0.03] border border-white/5 p-1 rounded-full backdrop-blur-md">
+                                {[
+                                    { id: "championship", label: "Campeonato", icon: Trophy },
+                                    { id: "news", label: "Notícias", icon: Newspaper }
+                                ].map(tab => {
+                                    const Icon = tab.icon;
+                                    const isActive = activeTab === tab.id;
+                                    return (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setActiveTab(tab.id)}
+                                            className={`relative flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors duration-300 z-10 ${
+                                                isActive ? 'text-white font-extrabold' : 'text-slate-400 hover:text-white'
+                                            }`}
+                                        >
+                                            {isActive && (
+                                                <motion.div
+                                                    layoutId="active-pill"
+                                                    className="absolute inset-0 bg-gradient-to-r from-[#ff0055]/85 to-[#06b6d4]/85 rounded-full -z-10 shadow-[0_0_15px_rgba(255,0,85,0.3)]"
+                                                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                                                />
+                                            )}
+                                            <Icon className="w-4 h-4" />
+                                            {tab.label}
+                                        </button>
+                                    );
+                                })}
+                            </nav>
+
+                            {/* Área do Time */}
+                            <a href="/paineladm" className="relative overflow-hidden group bg-gradient-to-r from-neon-pink to-[#db2777] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full shadow-[0_0_20px_rgba(255,0,85,0.25)] hover:shadow-[0_0_35px_rgba(6,182,212,0.35)] transition-all duration-300 border border-white/10">
+                                <span className="relative z-10 flex items-center gap-2">
+                                    Painel Admin <ArrowRight className="w-3.5 h-3.5" />
+                                </span>
+                                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
+                            </a>
+
+                        </div>
+                    </header>
+
+                    {/* 3. CONTEÚDO */}
+                    <main className="max-w-7xl mx-auto px-6 mt-8 relative z-10">
+                        <AnimatePresence mode="wait">
+                            
+                            {activeTab === "championship" ? (
+                                <motion.div
+                                    key="championship-tab"
+                                    variants={containerVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="hidden"
+                                    className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+                                >
+                                    {/* Selector de Campeonato Integrado */}
+                                    <motion.div variants={itemVariants} className="lg:col-span-3 flex justify-between items-center bg-white/[0.02] border border-white/5 p-4 rounded-2xl backdrop-blur-md">
+                                        <div className="flex items-center gap-2">
+                                            <Trophy className="w-5 h-5 text-neon-pink" />
+                                            <span className="font-extrabold text-sm uppercase tracking-wider text-slate-300">Escolha o Campeonato Ativo:</span>
+                                        </div>
+                                        <select 
+                                            value={selectedCampId} 
+                                            onChange={(e) => setSelectedCampId(e.target.value)}
+                                            className="bg-dark-card border border-white/10 px-4 py-2 rounded-xl text-xs font-bold text-white outline-none cursor-pointer hover:border-white/20 transition-all"
+                                        >
+                                            <option value="">Nenhum campeonato ativo</option>
+                                            {championships.map(c => (
+                                                <option key={c.id} value={c.id}>{c.nome}</option>
+                                            ))}
+                                        </select>
+                                    </motion.div>
+
+                                    {/* CARD PRÓXIMO CONFRONTO */}
+                                    {nextMatch ? (
+                                        <motion.div 
+                                            variants={itemVariants} 
+                                            className="lg:col-span-3 bg-white/[0.02] border border-white/5 rounded-3xl p-8 backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group hover:border-white/10 transition-colors duration-300"
+                                        >
+                                            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-neon-pink via-transparent to-neon-cyan opacity-60" />
+                                            
+                                            <div className="flex-1 flex items-center justify-around w-full">
+                                                <div className="flex flex-col items-center gap-3 text-center">
+                                                    <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                                                        <Shield className="w-8 h-8 text-neon-pink" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-extrabold text-base text-white">{nextMatch.time_casa}</h4>
+                                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Mandante</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col items-center gap-2">
+                                                    {nextMatch.gols_casa !== null && nextMatch.gols_fora !== null ? (
+                                                        <span className="text-3xl font-black text-neon-cyan bg-white/5 border border-white/5 px-4 py-2 rounded-xl">
+                                                            {nextMatch.gols_casa} - {nextMatch.gols_fora}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="bg-gradient-to-r from-neon-pink to-neon-cyan bg-clip-text text-transparent font-black text-3xl italic">
+                                                            VS
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                                        {nextMatch.rodada}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-col items-center gap-3 text-center">
+                                                    <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                                                        <Shield className="w-8 h-8 text-neon-cyan" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-extrabold text-base text-white">{nextMatch.time_fora}</h4>
+                                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Visitante</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="hidden md:block w-[1px] h-28 bg-white/10" />
+
+                                            <div className="w-full md:w-80 flex flex-col gap-3 text-center md:text-left">
+                                                <div className="flex items-center justify-center md:justify-start gap-2 text-neon-pink">
+                                                    <Clock className="w-4 h-4 animate-pulse" />
+                                                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-neon-pink">JOGO EM FOCO</span>
+                                                </div>
+                                                <h3 className="text-xl font-black text-white">
+                                                    {nextMatch.data_jogo ? new Date(nextMatch.data_jogo).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Horário a definir"}
+                                                </h3>
+                                                {nextMatch.video_url && (
+                                                    <a href={nextMatch.video_url} target="_blank" className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold text-neon-cyan hover:underline">
+                                                        <Tv className="w-4 h-4 text-red-500" /> Assistir Gravação da Partida
+                                                    </a>
+                                                )}
+
+                                                <div className="flex gap-2 justify-center md:justify-start mt-1">
+                                                    {[
+                                                        { val: countdown.days, unit: "d" },
+                                                        { val: countdown.hours, unit: "h" },
+                                                        { val: countdown.minutes, unit: "m" },
+                                                        { val: countdown.seconds, unit: "s" }
+                                                    ].map((t, idx) => (
+                                                        <div key={idx} className="flex flex-col items-center bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl min-w-[45px] backdrop-blur-md">
+                                                            <span className="text-xs font-black text-neon-cyan tracking-wide">{String(t.val).padStart(2, '0')}</span>
+                                                            <span className="text-[8px] uppercase font-bold text-slate-500">{t.unit}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ) : (
+                                        <div className="lg:col-span-3 text-center p-8 bg-white/[0.02] border border-white/5 rounded-3xl text-slate-400">Nenhum confronto cadastrado ainda para este campeonato.</div>
+                                    )}
+
+                                    {/* CLASSIFICAÇÃO DA LIGA */}
+                                    <motion.div 
+                                        variants={itemVariants}
+                                        className="lg:col-span-2 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                                    >
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
+                                            <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
+                                                <Trophy className="w-4 h-4 text-neon-pink" /> TABELA DE CLASSIFICAÇÃO
+                                            </h3>
+                                        </div>
+
+                                        <div className="overflow-x-auto">
+                                            {standings.length > 0 ? (
+                                                <table className="w-full text-left border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-white/5 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+                                                            <th className="py-3 px-2">Pos</th>
+                                                            <th className="py-3 px-2">Time</th>
+                                                            <th className="py-3 px-2 text-center">P</th>
+                                                            <th className="py-3 px-2 text-center">J</th>
+                                                            <th className="py-3 px-2 text-center">V</th>
+                                                            <th className="py-3 px-2 text-center">SG</th>
+                                                            <th className="py-3 px-2 text-right">Form</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-white/[0.02] text-xs">
+                                                        {standings.map((t, idx) => {
+                                                            const isQualifyZone = idx < 4;
+                                                            return (
+                                                                <tr key={idx} className="hover:bg-white/[0.015] transition-all">
+                                                                    <td className="py-3 px-2">
+                                                                        <span className={`font-bold flex items-center justify-center w-5 h-5 rounded-lg text-[10px] ${
+                                                                            isQualifyZone 
+                                                                                ? 'bg-gradient-to-r from-neon-pink/20 to-neon-pink/10 text-neon-pink border border-neon-pink/20' 
+                                                                                : 'text-slate-400 bg-white/5 border border-white/5'
+                                                                        }`}>
+                                                                            {t.rank}
+                                                                        </span>
+                                                                    </td>
+                                                                    <td className="py-3 px-2 font-bold text-white">{t.nome}</td>
+                                                                    <td className="py-3 px-2 text-center font-extrabold text-neon-cyan">{t.pts}</td>
+                                                                    <td className="py-3 px-2 text-center text-slate-400">{t.j}</td>
+                                                                    <td className="py-3 px-2 text-center text-slate-400">{t.v}</td>
+                                                                    <td className="py-3 px-2 text-center font-semibold text-slate-300">{t.sg > 0 ? `+${t.sg}` : t.sg}</td>
+                                                                    <td className="py-3 px-2">
+                                                                        <div className="flex justify-end gap-1">
+                                                                            {t.form.slice(-5).map((res, fIdx) => (
+                                                                                <span key={fIdx}>
+                                                                                    {res === "W" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+                                                                                    {res === "L" && <XCircle className="w-3.5 h-3.5 text-rose-500" />}
+                                                                                    {res === "D" && <MinusCircle className="w-3.5 h-3.5 text-amber-500" />}
+                                                                                </span>
+                                                                            ))}
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            ) : (
+                                                <div className="text-center py-8 text-slate-400 text-xs">Os placares dos confrontos ainda não foram lançados para gerar a classificação.</div>
+                                            )}
+                                        </div>
+                                    </motion.div>
+
+                                    {/* ARTILHARIA E ESTATÍSTICAS */}
+                                    <div className="flex flex-col gap-6">
+                                        <motion.div 
+                                            variants={itemVariants}
+                                            className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                                        >
+                                            <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
+                                                <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
+                                                    <Goal className="w-4 h-4 text-neon-cyan" /> ARTILHARIA & NOTAS
+                                                </h3>
+                                            </div>
+
+                                            <div className="flex flex-col gap-3">
+                                                {leaguePlayers.length > 0 ? (
+                                                    leaguePlayers.slice(0, 5).map((p, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between bg-white/[0.015] border border-white/5 p-3 rounded-xl hover:bg-white/[0.03] transition-all">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xs font-black text-neon-pink w-4">{idx+1}</span>
+                                                                <div>
+                                                                    <h4 className="text-xs font-bold text-white">{p.nome}</h4>
+                                                                    <span className="text-[9px] text-slate-500 font-semibold uppercase">{p.time}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-right">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] font-black text-neon-cyan">{p.gols} Gols</span>
+                                                                    <span className="text-[8px] font-bold text-slate-400">{p.assistencias} Ast</span>
+                                                                </div>
+                                                                <span className="text-xs font-black text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/20 px-2 py-0.5 rounded-lg">
+                                                                    {p.nota_media.toFixed(2)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="text-center py-6 text-slate-400 text-xs">Sem estatísticas salvas para este campeonato.</div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    </div>
+
+                                    {/* AGENDA DA RODADA */}
+                                    <motion.div 
+                                        variants={itemVariants}
+                                        className="lg:col-span-3 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
+                                    >
+                                        <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
+                                            <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
+                                                <Calendar className="w-4 h-4 text-neon-pink" /> CALENDÁRIO DA LIGA
+                                            </h3>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {matches.slice(0, 6).map((m, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    className="group relative overflow-hidden bg-dark-base/50 border border-white/5 p-4 rounded-xl flex flex-col gap-3 hover:border-white/15 transition-all cursor-pointer"
+                                                >
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[8px] uppercase font-black text-neon-cyan bg-neon-cyan/10 px-2 py-0.5 rounded-full border border-neon-cyan/20">{m.rodada}</span>
+                                                        <span className="text-[9px] font-semibold text-slate-400">
+                                                            {m.data_jogo ? new Date(m.data_jogo).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) : 'A confirmar'}
+                                                        </span>
+                                                    </div>
+                                                    
+                                                    <div className="flex justify-around items-center my-1">
+                                                        <span className="text-[11px] font-bold text-white truncate w-16 text-center">{m.time_casa}</span>
+                                                        <span className="text-slate-600 font-extrabold italic text-[10px]">
+                                                            {m.encerrada ? `${m.gols_casa} - ${m.gols_fora}` : 'VS'}
+                                                        </span>
+                                                        <span className="text-[11px] font-bold text-white truncate w-16 text-center">{m.time_fora}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="news-tab"
+                                    variants={containerVariants}
+                                    initial="hidden"
+                                    animate="visible"
+                                    exit="hidden"
+                                    className="grid grid-cols-1 md:grid-cols-3 gap-6"
+                                >
+                                    {news.length > 0 ? (
+                                        news.map((article) => (
+                                            <motion.article 
+                                                key={article.id}
+                                                variants={itemVariants}
+                                                className="group cursor-pointer bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden backdrop-blur-xl hover:border-white/10 transition-all duration-300 flex flex-col"
+                                            >
+                                                <div className="w-full h-48 overflow-hidden relative bg-white/5">
+                                                    <img 
+                                                        src={article.imagem_url || "https://i.ibb.co/C5B7BBjS/image.png"} 
+                                                        alt={article.titulo} 
+                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" 
+                                                        onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'"
+                                                    />
+                                                    <span className="absolute top-4 left-4 z-20 text-[8px] uppercase font-black tracking-widest bg-gradient-to-r from-neon-pink to-neon-cyan px-2.5 py-1 rounded-full border border-white/10">
+                                                        Notícia
+                                                    </span>
+                                                </div>
+
+                                                <div className="p-6 flex flex-col gap-3 flex-1">
+                                                    <span className="text-[9px] font-semibold text-slate-500 flex items-center gap-1">
+                                                        <Clock className="w-3 h-3" /> {new Date(article.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
+                                                    </span>
+                                                    <h3 className="text-base font-extrabold text-white leading-snug group-hover:text-neon-cyan transition-colors duration-300">
+                                                        {article.titulo}
+                                                    </h3>
+                                                    <p className="text-xs text-slate-400 leading-relaxed font-medium">
+                                                        {article.subtitulo || article.conteudo}
+                                                    </p>
+                                                </div>
+                                            </motion.article>
+                                        ))
+                                    ) : (
+                                        <div className="col-span-3 text-center py-12 text-slate-400">Nenhuma notícia publicada no mural ainda.</div>
+                                    )}
+                                </motion.div>
+                            )}
+
+                        </AnimatePresence>
+                    </main>
+
+                    {/* 4. FOOTER */}
+                    <footer className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
+                        <div className="flex flex-col items-center md:items-start gap-1">
+                            <span className="text-xs font-bold text-white">LIGA DE FUTEBOL VLS</span>
+                            <span className="text-[10px] text-slate-500 font-medium">© 2026 Liga VLS. Todos os direitos reservados. Design System Premium Liquid Glass.</span>
+                        </div>
+                        <div className="flex gap-4">
+                            <a href="https://instagram.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                                <i className="fa-brands fa-instagram text-sm"></i>
+                            </a>
+                            <a href="https://youtube.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                                <i className="fa-brands fa-youtube text-sm"></i>
+                            </a>
+                            <a href="https://discord.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+                                <i className="fa-brands fa-discord text-sm"></i>
+                            </a>
+                        </div>
+                    </footer>
+
+                </div>
+            );
         }
 
-        function nextSlide() {
-            const slides = document.querySelectorAll(".news-slide");
-            const dots = document.querySelectorAll(".control-dot");
-            if (slides.length <= 1) return;
-
-            slides[activeSlideIndex].classList.remove("active");
-            dots[activeSlideIndex].classList.remove("active");
-
-            activeSlideIndex = (activeSlideIndex + 1) % slides.length;
-
-            slides[activeSlideIndex].classList.add("active");
-            dots[activeSlideIndex].classList.add("active");
-        }
-
-        function setSlide(idx) {
-            const slides = document.querySelectorAll(".news-slide");
-            const dots = document.querySelectorAll(".control-dot");
-            if (idx === activeSlideIndex || slides.length <= idx) return;
-
-            slides[activeSlideIndex].classList.remove("active");
-            dots[activeSlideIndex].classList.remove("active");
-
-            activeSlideIndex = idx;
-
-            slides[activeSlideIndex].classList.add("active");
-            dots[activeSlideIndex].classList.add("active");
-
-            // Reseta cronômetro do loop
-            if (slideInterval) {
-                clearInterval(slideInterval);
-                slideInterval = setInterval(nextSlide, 6000);
-            }
-        }
+        // Render application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>

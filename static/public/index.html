@@ -1,677 +1,1033 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liga VLS — Portal Oficial</title>
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome para ícones -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Outfit', 'sans-serif'],
-                    },
-                    colors: {
-                        dark: {
-                            base: '#050508',
-                            card: '#09090e',
-                        },
-                        neon: {
-                            pink: '#ff0055',
-                            cyan: '#06b6d4',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liga VLS — Portal Oficial</title>
+  <meta name="description" content="Portal oficial da Liga VLS. Tabelas, artilharia, resultados, transmissões e notícias da liga.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-    <!-- Custom CSS styles for scrollbars and active transitions -->
-    <style>
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #050508;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 10px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: rgba(255, 255, 255, 0.1);
-        }
-        body {
-            background-color: #050508;
-            overflow-x: hidden;
-        }
-    </style>
+  <style>
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: #050508;
+      color: #fff;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
 
-    <!-- Import Map para garantir única instância de React compartilhada -->
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://esm.sh/react@18.2.0",
-          "react-dom": "https://esm.sh/react-dom@18.2.0/client",
-          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-          "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0"
-        }
-      }
-    </script>
-    
-    <!-- Babel Standalone para transpilação JSX no navegador -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    /* ============================================================
+       CUSTOM SCROLLBAR
+    ============================================================ */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #050508; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.15); }
+
+    /* ============================================================
+       CSS VARIABLES
+    ============================================================ */
+    :root {
+      --pink:    #ff0055;
+      --cyan:    #06b6d4;
+      --gold:    #f59e0b;
+      --bg:      #050508;
+      --bg-card: rgba(255,255,255,.025);
+      --border:  rgba(255,255,255,.06);
+      --text:    #ffffff;
+      --muted:   #94a3b8;
+      --subtle:  rgba(255,255,255,.035);
+    }
+
+    /* ============================================================
+       AURORA BACKGROUND — CSS pure keyframe animation
+    ============================================================ */
+    #aurora {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 0;
+      overflow: hidden;
+    }
+    .aurora-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(130px);
+      animation: auroraFloat linear infinite;
+    }
+    .aurora-blob.pink {
+      width: 560px; height: 560px;
+      background: radial-gradient(circle, rgba(255,0,85,.14) 0%, transparent 70%);
+      top: -15%; left: -12%;
+      animation-duration: 22s;
+    }
+    .aurora-blob.cyan {
+      width: 680px; height: 680px;
+      background: radial-gradient(circle, rgba(6,182,212,.10) 0%, transparent 70%);
+      bottom: -15%; right: -14%;
+      animation-duration: 28s;
+      animation-direction: reverse;
+    }
+    .aurora-blob.purple {
+      width: 380px; height: 380px;
+      background: radial-gradient(circle, rgba(168,85,247,.07) 0%, transparent 70%);
+      top: 45%; left: 55%;
+      animation-duration: 18s;
+    }
+    @keyframes auroraFloat {
+      0%   { transform: translate(0, 0) scale(1); }
+      25%  { transform: translate(60px, -50px) scale(1.08); }
+      50%  { transform: translate(-40px, 70px) scale(.93); }
+      75%  { transform: translate(80px, 30px) scale(1.05); }
+      100% { transform: translate(0, 0) scale(1); }
+    }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(5,5,8,.55);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      max-width: 1280px; margin: 0 auto;
+      padding: 1rem 1.5rem;
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    }
+    .logo {
+      display: flex; align-items: center; gap: .6rem;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 38px; height: 38px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .logo-icon i { color: var(--pink); font-size: 1rem; }
+    .logo-text {
+      font-size: 1.15rem; font-weight: 900; letter-spacing: .06em;
+      background: linear-gradient(135deg, var(--pink), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Tab nav pill */
+    .tab-nav {
+      display: flex; align-items: center;
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--border);
+      padding: 4px; border-radius: 50px;
+      gap: 2px;
+    }
+    .tab-btn {
+      position: relative;
+      display: flex; align-items: center; gap: 6px;
+      padding: .45rem 1.1rem;
+      border: none; background: none;
+      color: var(--muted);
+      font-family: 'Outfit', sans-serif;
+      font-size: .7rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .08em;
+      border-radius: 50px; cursor: pointer;
+      transition: color .3s;
+    }
+    .tab-btn.active {
+      color: #fff;
+      background: linear-gradient(135deg, rgba(255,0,85,.85), rgba(6,182,212,.85));
+      box-shadow: 0 0 18px rgba(255,0,85,.25);
+    }
+    .tab-btn:not(.active):hover { color: #fff; }
+
+    /* Admin button */
+    .btn-admin {
+      display: flex; align-items: center; gap: .4rem;
+      padding: .5rem 1.1rem;
+      border-radius: 50px;
+      background: linear-gradient(135deg, var(--pink), #db2777);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: .7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .08em;
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,.1);
+      box-shadow: 0 0 20px rgba(255,0,85,.25);
+      transition: box-shadow .3s, transform .2s;
+      white-space: nowrap;
+    }
+    .btn-admin:hover {
+      box-shadow: 0 0 32px rgba(6,182,212,.35);
+      transform: translateY(-1px);
+    }
+
+    /* ============================================================
+       MAIN WRAPPER
+    ============================================================ */
+    main {
+      position: relative; z-index: 1;
+      max-width: 1280px; margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ============================================================
+       TABS CONTENT
+    ============================================================ */
+    .tab-content { display: none; }
+    .tab-content.active {
+      display: block;
+      animation: fadeUp .5s ease forwards;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); filter: blur(6px); }
+      to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+    }
+
+    /* ============================================================
+       BENTO GRID
+    ============================================================ */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+    .bento .col-3 { grid-column: span 3; }
+    .bento .col-2 { grid-column: span 2; }
+    .bento .col-1 { grid-column: span 1; }
+    @media (max-width: 900px) {
+      .bento { grid-template-columns: 1fr; }
+      .bento .col-3, .bento .col-2, .bento .col-1 { grid-column: span 1; }
+    }
+
+    /* ============================================================
+       GLASS CARD
+    ============================================================ */
+    .glass {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      padding: 1.5rem;
+      transition: border-color .3s, transform .3s;
+    }
+    .glass:hover { border-color: rgba(255,255,255,.1); }
+
+    .card-title {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .8rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .08em;
+      margin-bottom: 1.2rem;
+      padding-bottom: .9rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title i { font-size: .9rem; }
+
+    /* ============================================================
+       CHAMPIONSHIP SELECTOR
+    ============================================================ */
+    .selector-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: .75rem;
+    }
+    .selector-bar label {
+      display: flex; align-items: center; gap: .5rem;
+      font-size: .8rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .07em;
+      color: var(--muted);
+    }
+    .selector-bar label i { color: var(--pink); }
+    select#camp-select {
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      padding: .55rem 1.1rem;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-size: .8rem; font-weight: 600;
+      outline: none; cursor: pointer;
+      transition: border-color .2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    select#camp-select option { background: #09090e; }
+    select#camp-select:hover { border-color: rgba(255,255,255,.15); }
+
+    /* ============================================================
+       NEXT MATCH HERO CARD
+    ============================================================ */
+    .match-hero {
+      position: relative; overflow: hidden;
+      padding: 2rem 2.5rem;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 2rem;
+    }
+    .match-hero::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--pink), transparent, var(--cyan));
+      opacity: .7;
+    }
+    .teams-wrap {
+      display: flex; align-items: center; gap: 2rem; flex: 1;
+      justify-content: center; min-width: 280px;
+    }
+    .team-block { text-align: center; }
+    .team-icon {
+      width: 64px; height: 64px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto .75rem;
+      transition: transform .3s;
+    }
+    .match-hero:hover .team-icon { transform: scale(1.05); }
+    .team-icon i { font-size: 1.6rem; }
+    .team-name { font-size: .9rem; font-weight: 800; }
+    .team-label { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-top: .2rem; }
+    .vs-block { text-align: center; }
+    .vs-score {
+      font-size: 2.2rem; font-weight: 900;
+      background: linear-gradient(135deg, var(--pink), var(--cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; font-style: italic;
+    }
+    .vs-score.result {
+      -webkit-text-fill-color: var(--cyan); color: var(--cyan);
+      background: none;
+    }
+    .vs-round {
+      display: inline-block; margin-top: .4rem;
+      font-size: .6rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .1em; color: var(--muted);
+      background: rgba(255,255,255,.04);
+      border: 1px solid var(--border);
+      padding: .25rem .8rem; border-radius: 20px;
+    }
+
+    .match-meta {
+      display: flex; flex-direction: column; gap: .75rem;
+      min-width: 220px;
+    }
+    .match-label {
+      display: flex; align-items: center; gap: .4rem;
+      font-size: .65rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: .1em;
+      color: var(--pink);
+    }
+    .match-label i { animation: pulse 2s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+    .match-date { font-size: 1.1rem; font-weight: 900; }
+    .match-video-link {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-size: .75rem; font-weight: 700; color: var(--cyan);
+      text-decoration: none;
+    }
+    .match-video-link:hover { text-decoration: underline; }
+    .match-video-link i { color: #ef4444; }
+
+    /* Countdown */
+    .countdown { display: flex; gap: .5rem; margin-top: .25rem; }
+    .cd-unit {
+      display: flex; flex-direction: column; align-items: center;
+      background: rgba(255,255,255,.05);
+      border: 1px solid var(--border);
+      padding: .4rem .7rem; border-radius: 10px;
+      min-width: 48px;
+    }
+    .cd-val { font-size: .85rem; font-weight: 900; color: var(--cyan); letter-spacing: .04em; }
+    .cd-lbl { font-size: .55rem; font-weight: 700; text-transform: uppercase; color: var(--muted); margin-top: .1rem; }
+
+    /* Divider vertical */
+    .v-divider {
+      width: 1px; height: 110px; background: var(--border);
+      flex-shrink: 0;
+    }
+    @media (max-width: 900px) { .v-divider { display: none; } }
+
+    /* ============================================================
+       STANDINGS TABLE
+    ============================================================ */
+    .table-wrap { overflow-x: auto; }
+    table.standings {
+      width: 100%; border-collapse: collapse;
+      font-size: .78rem;
+    }
+    table.standings thead th {
+      padding: .6rem .6rem;
+      font-size: .6rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .09em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    table.standings tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,.025);
+      transition: background .2s;
+    }
+    table.standings tbody tr:hover { background: rgba(255,255,255,.02); }
+    table.standings tbody td { padding: .75rem .6rem; }
+    .rank-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 6px;
+      font-size: .65rem; font-weight: 800;
+    }
+    .rank-badge.qualify {
+      background: linear-gradient(135deg, rgba(255,0,85,.2), rgba(255,0,85,.1));
+      color: var(--pink); border: 1px solid rgba(255,0,85,.2);
+    }
+    .rank-badge.regular {
+      background: rgba(255,255,255,.05);
+      color: var(--muted); border: 1px solid var(--border);
+    }
+    td.pts { font-weight: 900; color: var(--cyan); text-align: center; }
+    td.num { color: var(--muted); text-align: center; }
+    td.sg  { font-weight: 600; text-align: center; }
+    td.form-col { text-align: right; }
+    .form-dots { display: flex; justify-content: flex-end; gap: 3px; }
+    .form-dot {
+      width: 16px; height: 16px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .5rem; font-weight: 900;
+    }
+    .form-dot.W { background: rgba(16,185,129,.2); color: #10b981; }
+    .form-dot.L { background: rgba(239,68,68,.2); color: #ef4444; }
+    .form-dot.D { background: rgba(245,158,11,.2); color: #f59e0b; }
+
+    /* ============================================================
+       SCORERS / STATS CARD
+    ============================================================ */
+    .player-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,255,255,.015);
+      border: 1px solid rgba(255,255,255,.04);
+      padding: .7rem .9rem; border-radius: 12px;
+      margin-bottom: .6rem;
+      transition: background .2s;
+    }
+    .player-row:hover { background: rgba(255,255,255,.03); }
+    .player-row:last-child { margin-bottom: 0; }
+    .player-left { display: flex; align-items: center; gap: .7rem; }
+    .player-rank { font-size: .75rem; font-weight: 900; color: var(--pink); width: 18px; }
+    .player-name { font-size: .8rem; font-weight: 700; }
+    .player-team { font-size: .6rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .player-right { display: flex; align-items: center; gap: .6rem; }
+    .stat-goals { font-size: .85rem; font-weight: 900; color: var(--cyan); }
+    .stat-assists { font-size: .7rem; font-weight: 700; color: var(--muted); }
+    .stat-badge {
+      font-size: .7rem; font-weight: 900; color: var(--gold);
+      background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.2);
+      padding: .2rem .55rem; border-radius: 8px;
+    }
+
+    /* ============================================================
+       CALENDAR / SCHEDULE GRID
+    ============================================================ */
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 1rem;
+    }
+    .match-card {
+      background: rgba(255,255,255,.015);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 14px; padding: 1rem;
+      transition: border-color .3s, transform .3s;
+      cursor: default;
+    }
+    .match-card:hover {
+      border-color: rgba(6,182,212,.2);
+      transform: translateY(-2px);
+    }
+    .match-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .75rem; }
+    .round-badge {
+      font-size: .55rem; font-weight: 900; text-transform: uppercase; letter-spacing: .1em;
+      color: var(--cyan); background: rgba(6,182,212,.1);
+      border: 1px solid rgba(6,182,212,.2);
+      padding: .2rem .6rem; border-radius: 20px;
+    }
+    .match-date-small { font-size: .65rem; font-weight: 600; color: var(--muted); }
+    .match-teams { display: flex; align-items: center; justify-content: space-around; padding: .25rem 0; }
+    .match-team-name { font-size: .72rem; font-weight: 700; width: 70px; text-align: center; }
+    .match-vs { font-size: .7rem; font-weight: 900; font-style: italic; color: rgba(255,255,255,.25); }
+    .match-vs.result-score { color: var(--cyan); font-style: normal; font-size: .85rem; }
+
+    /* ============================================================
+       NEWS GRID
+    ============================================================ */
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+      gap: 1.4rem;
+    }
+    .news-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px; overflow: hidden;
+      transition: border-color .3s, transform .3s;
+      display: flex; flex-direction: column;
+    }
+    .news-card:hover {
+      border-color: rgba(255,255,255,.12);
+      transform: translateY(-4px);
+    }
+    .news-img-wrap { width: 100%; height: 180px; overflow: hidden; position: relative; background: var(--subtle); }
+    .news-img-wrap img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform .6s ease;
+    }
+    .news-card:hover .news-img-wrap img { transform: scale(1.06); }
+    .news-badge {
+      position: absolute; top: 12px; left: 12px; z-index: 2;
+      font-size: .55rem; font-weight: 900; text-transform: uppercase; letter-spacing: .1em;
+      padding: .25rem .7rem; border-radius: 20px;
+      background: linear-gradient(135deg, var(--pink), var(--cyan));
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .news-body { padding: 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .5rem; }
+    .news-date { font-size: .65rem; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: .35rem; }
+    .news-title { font-size: 1rem; font-weight: 800; line-height: 1.35; transition: color .3s; }
+    .news-card:hover .news-title { color: var(--cyan); }
+    .news-excerpt { font-size: .78rem; color: var(--muted); line-height: 1.6; margin-top: .25rem; }
+
+    /* ============================================================
+       EMPTY STATES
+    ============================================================ */
+    .empty {
+      text-align: center; padding: 3rem 1rem;
+      color: var(--muted); font-size: .85rem;
+    }
+    .empty i { font-size: 2rem; opacity: .3; display: block; margin-bottom: .75rem; }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      position: relative; z-index: 1;
+      max-width: 1280px; margin: 0 auto;
+      padding: 2rem 1.5rem;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1rem;
+    }
+    .footer-brand { font-size: .8rem; font-weight: 800; }
+    .footer-copy { font-size: .65rem; color: var(--muted); margin-top: .2rem; }
+    .socials { display: flex; gap: .6rem; }
+    .social-btn {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); text-decoration: none;
+      font-size: .85rem;
+      transition: background .2s, color .2s, transform .2s;
+    }
+    .social-btn:hover { background: rgba(255,255,255,.09); color: #fff; transform: scale(1.1); }
+
+    /* ============================================================
+       LOADING STATE
+    ============================================================ */
+    #loading-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: #050508;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 1rem;
+      transition: opacity .5s;
+    }
+    #loading-overlay.fade-out { opacity: 0; pointer-events: none; }
+    .loader-logo { font-size: 2.5rem; color: var(--pink); animation: pulse 1.5s infinite; }
+    .loader-text { font-size: .8rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .loader-bar { width: 160px; height: 2px; background: rgba(255,255,255,.06); border-radius: 2px; overflow: hidden; }
+    .loader-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--pink), var(--cyan)); border-radius: 2px; animation: loadBar 1.8s ease forwards; }
+    @keyframes loadBar { to { width: 100%; } }
+  </style>
 </head>
-<body class="text-white min-h-screen">
-    <div id="root">
-        <!-- Loader inicial sutil caso a rede demore para carregar os scripts -->
-        <div class="flex items-center justify-center min-h-screen bg-[#050508]">
-            <div class="flex flex-col items-center gap-4">
-                <i class="fa-solid fa-shield-halved text-4xl text-[#ff0055] animate-pulse"></i>
-                <span class="text-sm font-semibold tracking-wider text-slate-400">CARREGANDO PORTAL VLS...</span>
-            </div>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loading-overlay">
+    <i class="fa-solid fa-shield-halved loader-logo"></i>
+    <span class="loader-text">Carregando Portal VLS...</span>
+    <div class="loader-bar"><div class="loader-bar-fill"></div></div>
+  </div>
+
+  <!-- Aurora background -->
+  <div id="aurora" aria-hidden="true">
+    <div class="aurora-blob pink"></div>
+    <div class="aurora-blob cyan"></div>
+    <div class="aurora-blob purple"></div>
+  </div>
+
+  <!-- ============================================================ HEADER -->
+  <header>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <div class="logo-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <span class="logo-text">LIGA VLS</span>
+      </a>
+
+      <nav class="tab-nav" role="tablist">
+        <button id="tab-btn-championship" class="tab-btn active" role="tab" onclick="switchTab('championship')">
+          <i class="fa-solid fa-trophy"></i> Campeonato
+        </button>
+        <button id="tab-btn-news" class="tab-btn" role="tab" onclick="switchTab('news')">
+          <i class="fa-solid fa-newspaper"></i> Notícias
+        </button>
+      </nav>
+
+      <a href="/paineladm" class="btn-admin">
+        <i class="fa-solid fa-lock"></i> Painel Admin
+      </a>
+    </div>
+  </header>
+
+  <!-- ============================================================ MAIN -->
+  <main>
+
+    <!-- ============ TAB: CAMPEONATO ============ -->
+    <div id="tab-championship" class="tab-content active" role="tabpanel">
+      <div class="bento">
+
+        <!-- ROW 1: Championship selector -->
+        <div class="glass col-3 selector-bar">
+          <label for="camp-select">
+            <i class="fa-solid fa-trophy"></i> Campeonato:
+          </label>
+          <select id="camp-select" onchange="onCampChange(this.value)">
+            <option value="">-- Selecione o campeonato --</option>
+          </select>
         </div>
+
+        <!-- ROW 2 COL FULL: Next match hero -->
+        <div class="glass col-3 match-hero" id="next-match-card">
+          <div class="empty col-3">
+            <i class="fa-solid fa-calendar-xmark"></i>
+            Selecione um campeonato para ver os confrontos.
+          </div>
+        </div>
+
+        <!-- ROW 3: Standings (2/3) + Scorers (1/3) -->
+        <div class="glass col-2" id="standings-card">
+          <div class="card-title"><i class="fa-solid fa-trophy" style="color:var(--pink)"></i> Classificação</div>
+          <div class="empty"><i class="fa-solid fa-bars-progress"></i> Selecione um campeonato.</div>
+        </div>
+
+        <div class="glass col-1" id="scorers-card">
+          <div class="card-title"><i class="fa-solid fa-futbol" style="color:var(--cyan)"></i> Artilharia & Notas</div>
+          <div class="empty"><i class="fa-solid fa-chart-simple"></i> Selecione um campeonato.</div>
+        </div>
+
+        <!-- ROW 4: Schedule -->
+        <div class="glass col-3" id="schedule-card">
+          <div class="card-title"><i class="fa-solid fa-calendar-days" style="color:var(--pink)"></i> Calendário da Liga</div>
+          <div class="empty"><i class="fa-solid fa-calendar"></i> Selecione um campeonato.</div>
+        </div>
+
+      </div>
     </div>
 
-    <!-- Script React rodando sobre ESM compilado por Babel -->
-    <script type="text/babel" data-presets="react" data-type="module">
-        import React, { useState, useEffect } from 'react';
-        import ReactDOM from 'react-dom/client';
-        import { motion, AnimatePresence } from 'framer-motion';
+    <!-- ============ TAB: NOTÍCIAS ============ -->
+    <div id="tab-news" class="tab-content" role="tabpanel">
+      <div id="news-grid-wrap" class="news-grid">
+        <div class="empty" style="grid-column:1/-1"><i class="fa-solid fa-newspaper"></i> Carregando notícias...</div>
+      </div>
+    </div>
 
-        const easeCurve = [0.16, 1, 0.3, 1];
+  </main>
 
-        const containerVariants = {
-            hidden: { opacity: 0 },
-            visible: {
-                opacity: 1,
-                transition: {
-                    staggerChildren: 0.08,
-                    ease: easeCurve
-                }
-            }
-        };
+  <!-- ============================================================ FOOTER -->
+  <footer>
+    <div>
+      <div class="footer-brand">LIGA VLS</div>
+      <div class="footer-copy">© 2026 Liga VLS · Todos os direitos reservados.</div>
+    </div>
+    <div class="socials">
+      <a href="https://instagram.com" target="_blank" rel="noopener" class="social-btn"><i class="fa-brands fa-instagram"></i></a>
+      <a href="https://youtube.com"   target="_blank" rel="noopener" class="social-btn"><i class="fa-brands fa-youtube"></i></a>
+      <a href="https://discord.com"   target="_blank" rel="noopener" class="social-btn"><i class="fa-brands fa-discord"></i></a>
+    </div>
+  </footer>
 
-        const itemVariants = {
-            hidden: { opacity: 0, y: 30, filter: "blur(10px)" },
-            visible: { 
-                opacity: 1, 
-                y: 0, 
-                filter: "blur(0px)",
-                transition: { duration: 0.8, ease: easeCurve }
-            }
-        };
+  <!-- ============================================================ APP SCRIPT -->
+  <script>
+    'use strict';
 
-        function App() {
-            const [activeTab, setActiveTab] = useState("championship");
-            const [championships, setChampionships] = useState([]);
-            const [selectedCampId, setSelectedCampId] = useState("");
-            const [matches, setMatches] = useState([]);
-            const [news, setNews] = useState([]);
-            const [leaguePlayers, setLeaguePlayers] = useState([]);
-            const [countdown, setCountdown] = useState({ days: 2, hours: 14, minutes: 32, seconds: 45 });
+    // ---- State ----------------------------------------------------------------
+    const state = {
+      championships: [],
+      selectedId: null,
+      matches: [],
+      players: [],
+      news: [],
+      countdown: { days: 0, hours: 0, minutes: 0, seconds: 0 },
+      countdownTarget: null,
+      countdownTimer: null,
+    };
 
-            // Timer para contagem regressiva
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    setCountdown(prev => {
-                        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
-                        if (prev.minutes > 0) return { ...prev, minutes: prev.minutes - 1, seconds: 59 };
-                        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
-                        if (prev.days > 0) return { ...prev, days: prev.days - 1, hours: 23, minutes: 59, seconds: 59 };
-                        return prev;
-                    });
-                }, 1000);
-                return () => clearInterval(interval);
-            }, []);
+    // ---- Helpers --------------------------------------------------------------
+    function fmtDate(iso) {
+      if (!iso) return 'A confirmar';
+      return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    }
+    function fmtDateTime(iso) {
+      if (!iso) return 'Horário a definir';
+      return new Date(iso).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+    function fmtDateLong(iso) {
+      if (!iso) return '';
+      return new Date(iso).toLocaleDateString('pt-BR', { dateStyle: 'long' });
+    }
+    function esc(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
 
-            // Busca de dados
-            useEffect(() => {
-                fetchChampionships();
-                fetchNews();
-            }, []);
+    // ---- Tab switch -----------------------------------------------------------
+    function switchTab(id) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + id).classList.add('active');
+      document.getElementById('tab-btn-' + id).classList.add('active');
+    }
 
-            useEffect(() => {
-                if (selectedCampId) {
-                    fetchMatches(selectedCampId);
-                    fetchLeaguePlayers(selectedCampId);
-                } else {
-                    setMatches([]);
-                    setLeaguePlayers([]);
-                }
-            }, [selectedCampId]);
+    // ---- Fetch helpers --------------------------------------------------------
+    async function fetchJSON(url) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return [];
+        return await res.json();
+      } catch (_) { return []; }
+    }
 
-            const fetchChampionships = async () => {
-                try {
-                    const res = await fetch("/api/public/campeonatos");
-                    if (res.ok) {
-                        const data = await res.json();
-                        setChampionships(data);
-                        const active = data.filter(c => c.ativo);
-                        if (active.length > 0) {
-                            setSelectedCampId(active[0].id);
-                        }
-                    }
-                } catch (err) {
-                    console.error("Erro ao carregar campeonatos:", err);
-                }
-            };
+    // ---- Initial load ---------------------------------------------------------
+    async function init() {
+      const [champs, news] = await Promise.all([
+        fetchJSON('/api/public/campeonatos'),
+        fetchJSON('/api/public/noticias'),
+      ]);
 
-            const fetchNews = async () => {
-                try {
-                    const res = await fetch("/api/public/noticias");
-                    if (res.ok) {
-                        const data = await res.json();
-                        setNews(data);
-                    }
-                } catch (err) {
-                    console.error("Erro ao carregar notícias:", err);
-                }
-            };
+      state.championships = champs;
+      state.news = news;
 
-            const fetchMatches = async (campId) => {
-                try {
-                    const res = await fetch(`/api/public/partidas?campeonato_id=${campId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setMatches(data);
-                    }
-                } catch (err) {
-                    console.error("Erro ao carregar partidas:", err);
-                }
-            };
+      // Populate selector
+      const sel = document.getElementById('camp-select');
+      champs.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nome;
+        sel.appendChild(opt);
+      });
 
-            const fetchLeaguePlayers = async (campId) => {
-                try {
-                    const res = await fetch(`/api/public/jogadores_liga?campeonato_id=${campId}`);
-                    if (res.ok) {
-                        const data = await res.json();
-                        setLeaguePlayers(data);
-                    }
-                } catch (err) {
-                    console.error("Erro ao carregar artilharia:", err);
-                }
-            };
+      // Auto-select first active
+      const active = champs.find(c => c.ativo) || champs[0];
+      if (active) {
+        sel.value = active.id;
+        await onCampChange(active.id);
+      }
 
-            // Processa classificação
-            const calculateStandings = () => {
-                const table = {};
-                matches.forEach(m => {
-                    if (!m.encerrada || m.gols_casa === null || m.gols_fora === null) return;
-                    if (!table[m.time_casa]) table[m.time_casa] = { nome: m.time_casa, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, form: [] };
-                    if (!table[m.time_fora]) table[m.time_fora] = { nome: m.time_fora, j: 0, v: 0, e: 0, d: 0, gp: 0, gc: 0, sg: 0, pts: 0, form: [] };
+      // Render news
+      renderNews();
 
-                    const tc = table[m.time_casa];
-                    const tf = table[m.time_fora];
+      // Hide loader
+      setTimeout(() => {
+        const lo = document.getElementById('loading-overlay');
+        lo.classList.add('fade-out');
+        setTimeout(() => lo.remove(), 500);
+      }, 600);
+    }
 
-                    tc.j += 1;
-                    tf.j += 1;
-                    tc.gp += m.gols_casa;
-                    tc.gc += m.gols_fora;
-                    tf.gp += m.gols_fora;
-                    tf.gc += m.gols_casa;
+    // ---- Championship change --------------------------------------------------
+    async function onCampChange(campId) {
+      if (!campId) { clearChampData(); return; }
+      state.selectedId = campId;
 
-                    if (m.gols_casa > m.gols_fora) {
-                        tc.v += 1;
-                        tc.pts += 3;
-                        tc.form.push("W");
-                        tf.d += 1;
-                        tf.form.push("L");
-                    } else if (m.gols_casa < m.gols_fora) {
-                        tf.v += 1;
-                        tf.pts += 3;
-                        tf.form.push("W");
-                        tc.d += 1;
-                        tc.form.push("L");
-                    } else {
-                        tc.e += 1;
-                        tc.pts += 1;
-                        tc.form.push("D");
-                        tf.e += 1;
-                        tf.pts += 1;
-                        tf.form.push("D");
-                    }
-                    tc.sg = tc.gp - tc.gc;
-                    tf.sg = tf.gp - tf.gc;
-                });
+      const [matches, players] = await Promise.all([
+        fetchJSON('/api/public/partidas?campeonato_id=' + campId),
+        fetchJSON('/api/public/jogadores_liga?campeonato_id=' + campId),
+      ]);
 
-                return Object.values(table)
-                    .sort((a, b) => {
-                        if (b.pts !== a.pts) return b.pts - a.pts;
-                        if (b.v !== a.v) return b.v - a.v;
-                        return b.sg - a.sg;
-                    })
-                    .map((item, idx) => ({ ...item, rank: idx + 1 }));
-            };
+      state.matches = matches;
+      state.players = players;
 
-            const standings = calculateStandings();
-            const nextMatch = matches.find(m => !m.encerrada) || matches[0];
+      renderNextMatch();
+      renderStandings();
+      renderScorers();
+      renderSchedule();
+    }
 
-            return (
-                <div className="relative min-h-screen bg-dark-base text-white overflow-hidden pb-16 z-10">
-                    
-                    {/* Background Aurora Glow */}
-                    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-                        <motion.div 
-                            animate={{
-                                x: [0, 60, -40, 0],
-                                y: [0, -50, 70, 0],
-                                scale: [1, 1.1, 0.9, 1]
-                            }}
-                            transition={{
-                                duration: 20,
-                                repeat: Infinity,
-                                ease: "easeInOut"
-                            }}
-                            className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-[#ff0055]/10 to-[#d946ef]/5 filter blur-[130px] top-[-10%] left-[-10%]"
-                        />
-                        <motion.div 
-                            animate={{
-                                x: [0, -80, 40, 0],
-                                y: [0, 60, -50, 0],
-                                scale: [1, 0.95, 1.05, 1]
-                            }}
-                            transition={{
-                                duration: 24,
-                                repeat: Infinity,
-                                ease: "easeInOut"
-                            }}
-                            className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-br from-[#06b6d4]/10 to-[#14b8a6]/5 filter blur-[150px] bottom-[5%] right-[-10%]"
-                        />
-                    </div>
+    function clearChampData() {
+      state.matches = [];
+      state.players = [];
+      renderNextMatch();
+      renderStandings();
+      renderScorers();
+      renderSchedule();
+    }
 
-                    {/* Header */}
-                    <header className="sticky top-0 z-50 w-full bg-dark-base/60 backdrop-blur-xl border-b border-white/[0.05]">
-                        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-                            
-                            <div className="flex items-center gap-2 cursor-pointer">
-                                <div className="p-2 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center">
-                                    <i className="fa-solid fa-shield-halved text-neon-pink text-lg"></i>
-                                </div>
-                                <span className="text-lg font-black tracking-wider bg-gradient-to-r from-neon-pink to-neon-cyan bg-clip-text text-transparent">
-                                    LIGA VLS
-                                </span>
-                            </div>
+    // ---- Render: Next Match ---------------------------------------------------
+    function renderNextMatch() {
+      const card = document.getElementById('next-match-card');
+      const m = state.matches.find(x => !x.encerrada) || state.matches[0];
 
-                            <nav className="relative flex items-center gap-1 bg-white/[0.03] border border-white/5 p-1 rounded-full backdrop-blur-md">
-                                {[
-                                    { id: "championship", label: "Campeonato", icon: "fa-trophy" },
-                                    { id: "news", label: "Notícias", icon: "fa-newspaper" }
-                                ].map(tab => {
-                                    const isActive = activeTab === tab.id;
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`relative flex items-center gap-2 px-5 py-2 rounded-full text-xs font-semibold uppercase tracking-wider transition-colors duration-300 z-10 ${
-                                                isActive ? 'text-white font-extrabold' : 'text-slate-400 hover:text-white'
-                                            }`}
-                                        >
-                                            {isActive && (
-                                                <motion.div
-                                                    layoutId="active-pill"
-                                                    className="absolute inset-0 bg-gradient-to-r from-[#ff0055]/85 to-[#06b6d4]/85 rounded-full -z-10 shadow-[0_0_15px_rgba(255,0,85,0.3)]"
-                                                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                                                />
-                                            )}
-                                            <i className={`fa-solid ${tab.icon} text-xs`}></i>
-                                            {tab.label}
-                                        </button>
-                                    );
-                                })}
-                            </nav>
+      if (!m) {
+        card.innerHTML = `<div class="empty col-3" style="width:100%">
+          <i class="fa-solid fa-calendar-xmark"></i>
+          Nenhum confronto cadastrado para este campeonato.
+        </div>`;
+        stopCountdown();
+        return;
+      }
 
-                            <a href="/paineladm" className="relative overflow-hidden group bg-gradient-to-r from-neon-pink to-[#db2777] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full shadow-[0_0_20px_rgba(255,0,85,0.25)] hover:shadow-[0_0_35px_rgba(6,182,212,0.35)] transition-all duration-300 border border-white/10">
-                                <span className="relative z-10 flex items-center gap-2">
-                                    Painel Admin <i className="fa-solid fa-arrow-right text-xs"></i>
-                                </span>
-                                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-                            </a>
+      const hasScore = m.gols_casa !== null && m.gols_fora !== null;
+      const scoreHTML = hasScore
+        ? `<div class="vs-score result">${esc(String(m.gols_casa))} - ${esc(String(m.gols_fora))}</div>`
+        : `<div class="vs-score">VS</div>`;
 
-                        </div>
-                    </header>
+      const videoHTML = m.video_url
+        ? `<a href="${esc(m.video_url)}" target="_blank" rel="noopener" class="match-video-link">
+             <i class="fa-solid fa-tv"></i> Assistir Transmissão
+           </a>`
+        : '';
 
-                    {/* Main content */}
-                    <main className="max-w-7xl mx-auto px-6 mt-8 relative z-10">
-                        <AnimatePresence mode="wait">
-                            
-                            {activeTab === "championship" ? (
-                                <motion.div
-                                    key="championship-tab"
-                                    variants={containerVariants}
-                                    initial="hidden"
-                                    animate="visible"
-                                    exit="hidden"
-                                    className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-                                >
-                                    {/* Selector */}
-                                    <motion.div variants={itemVariants} className="lg:col-span-3 flex justify-between items-center bg-white/[0.02] border border-white/5 p-4 rounded-2xl backdrop-blur-md">
-                                        <div className="flex items-center gap-2">
-                                            <i className="fa-solid fa-trophy text-neon-pink text-base"></i>
-                                            <span className="font-extrabold text-sm uppercase tracking-wider text-slate-300">Escolha o Campeonato Ativo:</span>
-                                        </div>
-                                        <select 
-                                            value={selectedCampId} 
-                                            onChange={(e) => setSelectedCampId(e.target.value)}
-                                            className="bg-dark-card border border-white/10 px-4 py-2 rounded-xl text-xs font-bold text-white outline-none cursor-pointer hover:border-white/20 transition-all"
-                                        >
-                                            <option value="">Nenhum campeonato ativo</option>
-                                            {championships.map(c => (
-                                                <option key={c.id} value={c.id}>{c.nome}</option>
-                                            ))}
-                                        </select>
-                                    </motion.div>
+      card.innerHTML = `
+        <div class="teams-wrap">
+          <div class="team-block">
+            <div class="team-icon"><i class="fa-solid fa-shield-halved" style="color:var(--pink)"></i></div>
+            <div class="team-name">${esc(m.time_casa)}</div>
+            <div class="team-label">Mandante</div>
+          </div>
+          <div class="vs-block">
+            ${scoreHTML}
+            <div class="vs-round">${esc(m.rodada)}</div>
+          </div>
+          <div class="team-block">
+            <div class="team-icon"><i class="fa-solid fa-shield-halved" style="color:var(--cyan)"></i></div>
+            <div class="team-name">${esc(m.time_fora)}</div>
+            <div class="team-label">Visitante</div>
+          </div>
+        </div>
 
-                                    {/* PRÓXIMO CONFRONTO */}
-                                    {nextMatch ? (
-                                        <motion.div 
-                                            variants={itemVariants} 
-                                            className="lg:col-span-3 bg-white/[0.02] border border-white/5 rounded-3xl p-8 backdrop-blur-xl flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden group hover:border-white/10 transition-colors duration-300"
-                                        >
-                                            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-neon-pink via-transparent to-neon-cyan opacity-60" />
-                                            
-                                            <div className="flex-1 flex items-center justify-around w-full">
-                                                <div className="flex flex-col items-center gap-3 text-center">
-                                                    <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                                                        <i className="fa-solid fa-shield-halved text-neon-pink text-2xl"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-extrabold text-base text-white">{nextMatch.time_casa}</h4>
-                                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Mandante</span>
-                                                    </div>
-                                                </div>
+        <div class="v-divider"></div>
 
-                                                <div className="flex flex-col items-center gap-2">
-                                                    {nextMatch.gols_casa !== null && nextMatch.gols_fora !== null ? (
-                                                        <span className="text-3xl font-black text-neon-cyan bg-white/5 border border-white/5 px-4 py-2 rounded-xl">
-                                                            {nextMatch.gols_casa} - {nextMatch.gols_fora}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="bg-gradient-to-r from-neon-pink to-neon-cyan bg-clip-text text-transparent font-black text-3xl italic">
-                                                            VS
-                                                        </span>
-                                                    )}
-                                                    <span className="text-[9px] uppercase font-bold tracking-widest text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                                                        {nextMatch.rodada}
-                                                    </span>
-                                                </div>
+        <div class="match-meta">
+          <div class="match-label"><i class="fa-solid fa-circle-dot"></i> JOGO EM FOCO</div>
+          <div class="match-date">${fmtDateTime(m.data_jogo)}</div>
+          ${videoHTML}
+          <div class="countdown" id="countdown-wrap">
+            <div class="cd-unit"><span class="cd-val" id="cd-d">00</span><span class="cd-lbl">dias</span></div>
+            <div class="cd-unit"><span class="cd-val" id="cd-h">00</span><span class="cd-lbl">horas</span></div>
+            <div class="cd-unit"><span class="cd-val" id="cd-m">00</span><span class="cd-lbl">min</span></div>
+            <div class="cd-unit"><span class="cd-val" id="cd-s">00</span><span class="cd-lbl">seg</span></div>
+          </div>
+        </div>`;
 
-                                                <div className="flex flex-col items-center gap-3 text-center">
-                                                    <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                                                        <i className="fa-solid fa-shield-halved text-neon-cyan text-2xl"></i>
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="font-extrabold text-base text-white">{nextMatch.time_fora}</h4>
-                                                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Visitante</span>
-                                                    </div>
-                                                </div>
-                                            </div>
+      // Start countdown to match date if it exists
+      stopCountdown();
+      if (m.data_jogo) {
+        state.countdownTarget = new Date(m.data_jogo).getTime();
+        tickCountdown();
+        state.countdownTimer = setInterval(tickCountdown, 1000);
+      }
+    }
 
-                                            <div className="hidden md:block w-[1px] h-28 bg-white/10" />
+    function tickCountdown() {
+      const now = Date.now();
+      let diff = Math.max(0, Math.floor((state.countdownTarget - now) / 1000));
+      const d = Math.floor(diff / 86400); diff -= d * 86400;
+      const h = Math.floor(diff / 3600);  diff -= h * 3600;
+      const mn = Math.floor(diff / 60);   diff -= mn * 60;
+      const s = diff;
+      const pad = v => String(v).padStart(2, '0');
+      const el = id => document.getElementById(id);
+      if (el('cd-d')) {
+        el('cd-d').textContent = pad(d);
+        el('cd-h').textContent = pad(h);
+        el('cd-m').textContent = pad(mn);
+        el('cd-s').textContent = pad(s);
+      }
+    }
 
-                                            <div className="w-full md:w-80 flex flex-col gap-3 text-center md:text-left">
-                                                <div className="flex items-center justify-center md:justify-start gap-2 text-neon-pink">
-                                                    <i className="fa-solid fa-clock text-neon-pink animate-pulse text-sm"></i>
-                                                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-neon-pink">JOGO EM FOCO</span>
-                                                </div>
-                                                <h3 className="text-xl font-black text-white">
-                                                    {nextMatch.data_jogo ? new Date(nextMatch.data_jogo).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Horário a definir"}
-                                                </h3>
-                                                {nextMatch.video_url && (
-                                                    <a href={nextMatch.video_url} target="_blank" className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold text-neon-cyan hover:underline">
-                                                        <i className="fa-solid fa-tv text-red-500 text-sm"></i> Assistir Transmissão
-                                                    </a>
-                                                )}
+    function stopCountdown() {
+      if (state.countdownTimer) { clearInterval(state.countdownTimer); state.countdownTimer = null; }
+    }
 
-                                                <div className="flex gap-2 justify-center md:justify-start mt-1">
-                                                    {[
-                                                        { val: countdown.days, unit: "d" },
-                                                        { val: countdown.hours, unit: "h" },
-                                                        { val: countdown.minutes, unit: "m" },
-                                                        { val: countdown.seconds, unit: "s" }
-                                                    ].map((t, idx) => (
-                                                        <div key={idx} className="flex flex-col items-center bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl min-w-[45px] backdrop-blur-md">
-                                                            <span className="text-xs font-black text-neon-cyan tracking-wide">{String(t.val).padStart(2, '0')}</span>
-                                                            <span className="text-[8px] uppercase font-bold text-slate-500">{t.unit}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    ) : (
-                                        <div className="lg:col-span-3 text-center p-8 bg-white/[0.02] border border-white/5 rounded-3xl text-slate-400 text-sm">Nenhum confronto cadastrado ainda para este campeonato.</div>
-                                    )}
+    // ---- Render: Standings ---------------------------------------------------
+    function renderStandings() {
+      const card = document.getElementById('standings-card');
 
-                                    {/* CLASSIFICAÇÃO */}
-                                    <motion.div 
-                                        variants={itemVariants}
-                                        className="lg:col-span-2 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
-                                    >
-                                        <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
-                                            <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                <i className="fa-solid fa-trophy text-neon-pink text-base"></i> TABELA DE CLASSIFICAÇÃO
-                                            </h3>
-                                        </div>
+      const tbl = buildStandings();
+      if (!tbl.length) {
+        card.innerHTML = `
+          <div class="card-title"><i class="fa-solid fa-trophy" style="color:var(--pink)"></i> Classificação</div>
+          <div class="empty"><i class="fa-solid fa-bars-progress"></i> Placares ainda não lançados.</div>`;
+        return;
+      }
 
-                                        <div className="overflow-x-auto">
-                                            {standings.length > 0 ? (
-                                                <table className="w-full text-left border-collapse">
-                                                    <thead>
-                                                        <tr className="border-b border-white/5 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
-                                                            <th className="py-3 px-2">Pos</th>
-                                                            <th className="py-3 px-2">Time</th>
-                                                            <th className="py-3 px-2 text-center">P</th>
-                                                            <th className="py-3 px-2 text-center">J</th>
-                                                            <th className="py-3 px-2 text-center">V</th>
-                                                            <th className="py-3 px-2 text-center">SG</th>
-                                                            <th className="py-3 px-2 text-right">Form</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-white/[0.02] text-xs">
-                                                        {standings.map((t, idx) => {
-                                                            const isQualifyZone = idx < 4;
-                                                            return (
-                                                                <tr key={idx} className="hover:bg-white/[0.015] transition-all">
-                                                                    <td className="py-3 px-2">
-                                                                        <span className={`font-bold flex items-center justify-center w-5 h-5 rounded-lg text-[10px] ${
-                                                                            isQualifyZone 
-                                                                                ? 'bg-gradient-to-r from-neon-pink/20 to-neon-pink/10 text-neon-pink border border-neon-pink/20' 
-                                                                                : 'text-slate-400 bg-white/5 border border-white/5'
-                                                                        }`}>
-                                                                            {t.rank}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className="py-3 px-2 font-bold text-white">{t.nome}</td>
-                                                                    <td className="py-3 px-2 text-center font-extrabold text-neon-cyan">{t.pts}</td>
-                                                                    <td className="py-3 px-2 text-center text-slate-400">{t.j}</td>
-                                                                    <td className="py-3 px-2 text-center text-slate-400">{t.v}</td>
-                                                                    <td className="py-3 px-2 text-center font-semibold text-slate-300">{t.sg > 0 ? `+${t.sg}` : t.sg}</td>
-                                                                    <td className="py-3 px-2">
-                                                                        <div className="flex justify-end gap-1">
-                                                                            {t.form.slice(-5).map((res, fIdx) => (
-                                                                                <span key={fIdx}>
-                                                                                    {res === "W" && <i className="fa-solid fa-circle-check text-emerald-500 text-sm"></i>}
-                                                                                    {res === "L" && <i className="fa-solid fa-circle-xmark text-rose-500 text-sm"></i>}
-                                                                                    {res === "D" && <i className="fa-solid fa-circle-minus text-amber-500 text-sm"></i>}
-                                                                                </span>
-                                                                            ))}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            ) : (
-                                                <div className="text-center py-8 text-slate-400 text-xs">Os placares dos confrontos ainda não foram lançados para gerar a classificação.</div>
-                                            )}
-                                        </div>
-                                    </motion.div>
+      const rows = tbl.map((t, i) => {
+        const qualify = i < 4;
+        const formDots = t.form.slice(-5).map(r =>
+          `<div class="form-dot ${r}">${r}</div>`
+        ).join('');
+        const sgStr = t.sg > 0 ? '+' + t.sg : String(t.sg);
+        return `<tr>
+          <td><span class="rank-badge ${qualify ? 'qualify' : 'regular'}">${t.rank}</span></td>
+          <td style="font-weight:700">${esc(t.nome)}</td>
+          <td class="pts">${t.pts}</td>
+          <td class="num">${t.j}</td>
+          <td class="num">${t.v}</td>
+          <td class="sg">${sgStr}</td>
+          <td class="form-col"><div class="form-dots">${formDots}</div></td>
+        </tr>`;
+      }).join('');
 
-                                    {/* ARTILHARIA & NOTAS */}
-                                    <div className="flex flex-col gap-6">
-                                        <motion.div 
-                                            variants={itemVariants}
-                                            className="bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
-                                        >
-                                            <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
-                                                <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                    <i className="fa-solid fa-soccer-ball text-neon-cyan text-base"></i> ARTILHARIA & NOTAS
-                                                </h3>
-                                            </div>
+      card.innerHTML = `
+        <div class="card-title"><i class="fa-solid fa-trophy" style="color:var(--pink)"></i> Classificação</div>
+        <div class="table-wrap">
+          <table class="standings">
+            <thead><tr>
+              <th>Pos</th><th>Time</th>
+              <th style="text-align:center">P</th>
+              <th style="text-align:center">J</th>
+              <th style="text-align:center">V</th>
+              <th style="text-align:center">SG</th>
+              <th style="text-align:right">Form</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
 
-                                            <div className="flex flex-col gap-3">
-                                                {leaguePlayers.length > 0 ? (
-                                                    leaguePlayers.slice(0, 5).map((p, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between bg-white/[0.015] border border-white/5 p-3 rounded-xl hover:bg-white/[0.03] transition-all">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-xs font-black text-neon-pink w-4">{idx+1}</span>
-                                                                <div>
-                                                                    <h4 className="text-xs font-bold text-white">{p.nome}</h4>
-                                                                    <span className="text-[9px] text-slate-500 font-semibold uppercase">{p.time}</span>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-3 text-right">
-                                                                <div className="flex flex-col">
-                                                                    <span className="text-[10px] font-black text-neon-cyan">{p.gols} Gols</span>
-                                                                    <span className="text-[8px] font-bold text-slate-400">{p.assistencias} Ast</span>
-                                                                </div>
-                                                                <span className="text-xs font-black text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/20 px-2 py-0.5 rounded-lg">
-                                                                    {p.nota_media.toFixed(2)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="text-center py-6 text-slate-400 text-xs">Sem estatísticas salvas para este campeonato.</div>
-                                                )}
-                                            </div>
-                                        </motion.div>
-                                    </div>
-
-                                    {/* CALENDÁRIO */}
-                                    <motion.div 
-                                        variants={itemVariants}
-                                        className="lg:col-span-3 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
-                                    >
-                                        <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
-                                            <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                <i className="fa-solid fa-calendar-days text-neon-pink text-base"></i> CALENDÁRIO DA LIGA
-                                            </h3>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            {matches.slice(0, 6).map((m, idx) => (
-                                                <div 
-                                                    key={idx} 
-                                                    className="group relative overflow-hidden bg-dark-base/50 border border-white/5 p-4 rounded-xl flex flex-col gap-3 hover:border-white/15 transition-all cursor-pointer"
-                                                >
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-[8px] uppercase font-black text-neon-cyan bg-neon-cyan/10 px-2 py-0.5 rounded-full border border-neon-cyan/20">{m.rodada}</span>
-                                                        <span className="text-[9px] font-semibold text-slate-400">
-                                                            {m.data_jogo ? new Date(m.data_jogo).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'}) : 'A confirmar'}
-                                                        </span>
-                                                    </div>
-                                                    
-                                                    <div className="flex justify-around items-center my-1">
-                                                        <span className="text-[11px] font-bold text-white truncate w-16 text-center">{m.time_casa}</span>
-                                                        <span className="text-slate-600 font-extrabold italic text-[10px]">
-                                                            {m.encerrada ? `${m.gols_casa} - ${m.gols_fora}` : 'VS'}
-                                                        </span>
-                                                        <span className="text-[11px] font-bold text-white truncate w-16 text-center">{m.time_fora}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="news-tab"
-                                    variants={containerVariants}
-                                    initial="hidden"
-                                    animate="visible"
-                                    exit="hidden"
-                                    className="grid grid-cols-1 md:grid-cols-3 gap-6"
-                                >
-                                    {news.length > 0 ? (
-                                        news.map((article) => (
-                                            <motion.article 
-                                                key={article.id}
-                                                variants={itemVariants}
-                                                className="group cursor-pointer bg-white/[0.02] border border-white/5 rounded-3xl overflow-hidden backdrop-blur-xl hover:border-white/10 transition-all duration-300 flex flex-col"
-                                            >
-                                                <div className="w-full h-48 overflow-hidden relative bg-white/5">
-                                                    <img 
-                                                        src={article.imagem_url || "https://i.ibb.co/C5B7BBjS/image.png"} 
-                                                        alt={article.titulo} 
-                                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" 
-                                                        onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'"
-                                                    />
-                                                    <span className="absolute top-4 left-4 z-20 text-[8px] uppercase font-black tracking-widest bg-gradient-to-r from-neon-pink to-neon-cyan px-2.5 py-1 rounded-full border border-white/10">
-                                                        Notícia
-                                                    </span>
-                                                </div>
-
-                                                <div className="p-6 flex flex-col gap-3 flex-1">
-                                                    <span className="text-[9px] font-semibold text-slate-500 flex items-center gap-1">
-                                                        <i className="fa-solid fa-clock text-slate-500 text-xs"></i> {new Date(article.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
-                                                    </span>
-                                                    <h3 className="text-base font-extrabold text-white leading-snug group-hover:text-neon-cyan transition-colors duration-300">
-                                                        {article.titulo}
-                                                    </h3>
-                                                    <p className="text-xs text-slate-400 leading-relaxed font-medium">
-                                                        {article.subtitulo || article.conteudo}
-                                                    </p>
-                                                </div>
-                                            </motion.article>
-                                        ))
-                                    ) : (
-                                        <div className="col-span-3 text-center py-12 text-slate-400">Nenhuma notícia publicada no mural ainda.</div>
-                                    )}
-                                </motion.div>
-                            )}
-
-                        </AnimatePresence>
-                    </main>
-
-                    {/* Footer */}
-                    <footer className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
-                        <div className="flex flex-col items-center md:items-start gap-1">
-                            <span className="text-xs font-bold text-white">LIGA DE FUTEBOL VLS</span>
-                            <span className="text-[10px] text-slate-500 font-medium">© 2026 Liga VLS. Todos os direitos reservados. Design System Premium Liquid Glass.</span>
-                        </div>
-                        <div className="flex gap-4">
-                            <a href="https://instagram.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
-                                <i className="fa-brands fa-instagram text-sm"></i>
-                            </a>
-                            <a href="https://youtube.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
-                                <i className="fa-brands fa-youtube text-sm"></i>
-                            </a>
-                            <a href="https://discord.com" target="_blank" className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
-                                <i className="fa-brands fa-discord text-sm"></i>
-                            </a>
-                        </div>
-                    </footer>
-
-                </div>
-            );
+    function buildStandings() {
+      const tbl = {};
+      state.matches.forEach(m => {
+        if (!m.encerrada || m.gols_casa === null || m.gols_fora === null) return;
+        [m.time_casa, m.time_fora].forEach(t => {
+          if (!tbl[t]) tbl[t] = { nome: t, j:0, v:0, e:0, d:0, gp:0, gc:0, sg:0, pts:0, form:[] };
+        });
+        const tc = tbl[m.time_casa], tf = tbl[m.time_fora];
+        tc.j++; tf.j++;
+        tc.gp += m.gols_casa; tc.gc += m.gols_fora;
+        tf.gp += m.gols_fora; tf.gc += m.gols_casa;
+        if (m.gols_casa > m.gols_fora) {
+          tc.v++; tc.pts += 3; tc.form.push('W'); tf.d++; tf.form.push('L');
+        } else if (m.gols_casa < m.gols_fora) {
+          tf.v++; tf.pts += 3; tf.form.push('W'); tc.d++; tc.form.push('L');
+        } else {
+          tc.e++; tc.pts++; tc.form.push('D'); tf.e++; tf.pts++; tf.form.push('D');
         }
+        tc.sg = tc.gp - tc.gc; tf.sg = tf.gp - tf.gc;
+      });
+      return Object.values(tbl)
+        .sort((a,b) => b.pts - a.pts || b.v - a.v || b.sg - a.sg)
+        .map((t, i) => ({ ...t, rank: i+1 }));
+    }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+    // ---- Render: Scorers / Stats ---------------------------------------------
+    function renderScorers() {
+      const card = document.getElementById('scorers-card');
+      if (!state.players.length) {
+        card.innerHTML = `
+          <div class="card-title"><i class="fa-solid fa-futbol" style="color:var(--cyan)"></i> Artilharia & Notas</div>
+          <div class="empty"><i class="fa-solid fa-chart-simple"></i> Sem estatísticas cadastradas.</div>`;
+        return;
+      }
+      const sorted = [...state.players].sort((a,b) => b.gols - a.gols).slice(0, 8);
+      const rows = sorted.map((p, i) => `
+        <div class="player-row">
+          <div class="player-left">
+            <div class="player-rank">${i+1}</div>
+            <div>
+              <div class="player-name">${esc(p.nome)}</div>
+              <div class="player-team">${esc(p.time)}</div>
+            </div>
+          </div>
+          <div class="player-right">
+            <div>
+              <div class="stat-goals">${p.gols} <small style="font-size:.6rem;font-weight:600;color:var(--muted)">gols</small></div>
+              <div class="stat-assists">${p.assistencias} ast</div>
+            </div>
+            <div class="stat-badge">${parseFloat(p.nota_media).toFixed(2)}</div>
+          </div>
+        </div>`).join('');
+
+      card.innerHTML = `
+        <div class="card-title"><i class="fa-solid fa-futbol" style="color:var(--cyan)"></i> Artilharia & Notas</div>
+        ${rows}`;
+    }
+
+    // ---- Render: Schedule ---------------------------------------------------
+    function renderSchedule() {
+      const card = document.getElementById('schedule-card');
+      if (!state.matches.length) {
+        card.innerHTML = `
+          <div class="card-title"><i class="fa-solid fa-calendar-days" style="color:var(--pink)"></i> Calendário da Liga</div>
+          <div class="empty"><i class="fa-solid fa-calendar"></i> Nenhuma partida cadastrada.</div>`;
+        return;
+      }
+      const items = state.matches.slice(0, 9).map(m => {
+        const hasScore = m.encerrada && m.gols_casa !== null && m.gols_fora !== null;
+        const vsHTML = hasScore
+          ? `<span class="match-vs result-score">${m.gols_casa} - ${m.gols_fora}</span>`
+          : `<span class="match-vs">VS</span>`;
+        return `
+          <div class="match-card">
+            <div class="match-card-header">
+              <span class="round-badge">${esc(m.rodada)}</span>
+              <span class="match-date-small">${fmtDate(m.data_jogo)}</span>
+            </div>
+            <div class="match-teams">
+              <span class="match-team-name">${esc(m.time_casa)}</span>
+              ${vsHTML}
+              <span class="match-team-name">${esc(m.time_fora)}</span>
+            </div>
+          </div>`;
+      }).join('');
+
+      card.innerHTML = `
+        <div class="card-title"><i class="fa-solid fa-calendar-days" style="color:var(--pink)"></i> Calendário da Liga</div>
+        <div class="schedule-grid">${items}</div>`;
+    }
+
+    // ---- Render: News -------------------------------------------------------
+    function renderNews() {
+      const wrap = document.getElementById('news-grid-wrap');
+      if (!state.news.length) {
+        wrap.innerHTML = `<div class="empty" style="grid-column:1/-1">
+          <i class="fa-solid fa-newspaper"></i> Nenhuma notícia publicada ainda.
+        </div>`;
+        return;
+      }
+      const sorted = [...state.news].sort((a,b) => new Date(b.data_publicacao) - new Date(a.data_publicacao));
+      wrap.innerHTML = sorted.map(n => {
+        const img = n.imagem_url || 'https://images.unsplash.com/photo-1431324155629-1a6edd1d141d?q=80&w=600&auto=format&fit=crop';
+        return `
+          <article class="news-card">
+            <div class="news-img-wrap">
+              <img src="${esc(img)}" alt="${esc(n.titulo)}" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1431324155629-1a6edd1d141d?q=80&w=600&auto=format&fit=crop'">
+              <span class="news-badge">Notícia</span>
+            </div>
+            <div class="news-body">
+              <div class="news-date"><i class="fa-regular fa-clock"></i> ${fmtDateLong(n.data_publicacao)}</div>
+              <h3 class="news-title">${esc(n.titulo)}</h3>
+              <p class="news-excerpt">${esc(n.subtitulo || n.conteudo || '')}</p>
+            </div>
+          </article>`;
+      }).join('');
+    }
+
+    // ---- Boot ----------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
 </html>

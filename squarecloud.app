@@ -1,0 +1,6 @@
+DISPLAY_NAME=VLS Guru
+DESCRIPTION=Bot e Painel da Liga VLS
+MAIN=main.py
+MEMORY=256
+VERSION=recommended
+AUTORUN=true

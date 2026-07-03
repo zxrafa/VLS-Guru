@@ -641,6 +641,57 @@ async def api_delete_noticia_endpoint(request: web.Request) -> web.Response:
     return web.Response(text="Erro ao deletar notícia.", status=500)
 
 
+async def api_get_public_jogadores_liga(request: web.Request) -> web.Response:
+    from database import get_all_jogadores_liga
+    c_id = request.query.get("campeonato_id")
+    players = await get_all_jogadores_liga(c_id)
+    return web.json_response(players)
+
+
+@login_required
+async def api_post_jogador_liga(request: web.Request) -> web.Response:
+    from database import save_jogador_liga
+    body = await request.json()
+    
+    p_id = body.get("id", "").strip()
+    c_id = body.get("campeonato_id", "").strip()
+    nome = body.get("nome", "").strip()
+    time_name = body.get("time", "").strip()
+    
+    if not c_id or not nome or not time_name:
+        return web.Response(text="Campos obrigatórios ausentes para o jogador da liga.", status=400)
+
+    if not p_id:
+        import uuid
+        p_id = str(uuid.uuid4())
+
+    player_data = {
+        "id": p_id,
+        "campeonato_id": c_id,
+        "nome": nome,
+        "time": time_name,
+        "gols": int(body.get("gols", 0) or 0),
+        "assistencias": int(body.get("assistencias", 0) or 0),
+        "nota_media": float(body.get("nota_media", 0.0) or 0.0),
+        "jogos": int(body.get("jogos", 0) or 0)
+    }
+
+    success = await save_jogador_liga(player_data)
+    if success:
+        return web.json_response({"success": True, "id": p_id})
+    return web.Response(text="Erro ao salvar estatísticas do jogador.", status=500)
+
+
+@login_required
+async def api_delete_jogador_liga_endpoint(request: web.Request) -> web.Response:
+    from database import delete_jogador_liga
+    p_id = request.match_info.get("id")
+    success = await delete_jogador_liga(p_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao deletar estatísticas do jogador.", status=500)
+
+
 # ==============================================================================
 # CONFIGURAÇÃO E INÍCIO DO SERVIDOR WEB
 # ==============================================================================
@@ -676,6 +727,11 @@ async def start_web_server():
     app.router.add_get("/api/public/noticias",             api_get_public_noticias)
     app.router.add_post("/api/noticias",                   api_post_noticia)
     app.router.add_delete("/api/noticias/{id}",            api_delete_noticia_endpoint)
+
+    # Jogadores da Liga (Estatísticas)
+    app.router.add_get("/api/public/jogadores_liga",       api_get_public_jogadores_liga)
+    app.router.add_post("/api/jogadores_liga",             api_post_jogador_liga)
+    app.router.add_delete("/api/jogadores_liga/{id}",      api_delete_jogador_liga_endpoint)
 
     # Coleções
     app.router.add_get("/api/colecoes",          api_get_colecoes)

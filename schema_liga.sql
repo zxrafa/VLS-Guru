@@ -63,3 +63,22 @@ CREATE POLICY "Leitura publica de noticias" ON public.noticias FOR SELECT USING 
 CREATE POLICY "Escrita restrita para campeonatos" ON public.campeonatos FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Escrita restrita para partidas" ON public.partidas FOR ALL TO service_role USING (true) WITH CHECK (true);
 CREATE POLICY "Escrita restrita para noticias" ON public.noticias FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+-- 4. TABELA DE JOGADORES DA LIGA (ESTATÍSTICAS)
+CREATE TABLE IF NOT EXISTS public.jogadores_liga (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    campeonato_id UUID REFERENCES public.campeonatos(id) ON DELETE CASCADE,
+    nome TEXT NOT NULL,
+    time TEXT NOT NULL,
+    gols INTEGER DEFAULT 0,
+    assistencias INTEGER DEFAULT 0,
+    nota_media NUMERIC(4, 2) DEFAULT 0.00,
+    jogos INTEGER DEFAULT 0,
+    criado_em TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+ALTER TABLE public.jogadores_liga ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Leitura publica de jogadores_liga" ON public.jogadores_liga;
+DROP POLICY IF EXISTS "Escrita restrita para jogadores_liga" ON public.jogadores_liga;
+CREATE POLICY "Leitura publica de jogadores_liga" ON public.jogadores_liga FOR SELECT USING (true);
+CREATE POLICY "Escrita restrita para jogadores_liga" ON public.jogadores_liga FOR ALL TO service_role USING (true) WITH CHECK (true);

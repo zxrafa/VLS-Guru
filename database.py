@@ -79,6 +79,19 @@ def init_db():
                 conteudo TEXT NOT NULL,
                 imagem_url TEXT,
                 data_publicacao TEXT DEFAULT CURRENT_TIMESTAMP
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS jogadores_liga (
+                id TEXT PRIMARY KEY,
+                campeonato_id TEXT,
+                nome TEXT NOT NULL,
+                time TEXT NOT NULL,
+                gols INTEGER DEFAULT 0,
+                assistencias INTEGER DEFAULT 0,
+                nota_media REAL DEFAULT 0.0,
+                jogos INTEGER DEFAULT 0,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(campeonato_id) REFERENCES campeonatos(id) ON DELETE CASCADE
             )
         """)
         conn.commit()
@@ -615,5 +628,112 @@ async def delete_noticia(noticia_id: str) -> bool:
                 return True
             except Exception as e:
                 print(f"Erro ao deletar noticia local: {e}")
+                return False
+        return await asyncio.to_thread(remove)
+
+
+# ==============================================================================
+# CRUD PARA JOGADORES DA LIGA (ESTATÍSTICAS)
+# ==============================================================================
+
+async def get_all_jogadores_liga(campeonato_id: str = None) -> list:
+    if use_supabase:
+        def fetch():
+            try:
+                query = supabase_client.table("jogadores_liga").select("*")
+                if campeonato_id:
+                    query = query.eq("campeonato_id", campeonato_id)
+                res = query.order("gols", desc=True).execute()
+                # Converte decimais retornados pelo Supabase para float
+                data = res.data or []
+                for p in data:
+                    if "nota_media" in p and p["nota_media"] is not None:
+                        p["nota_media"] = float(p["nota_media"])
+                return data
+            except Exception as e:
+                print(f"Erro ao obter jogadores_liga Supabase: {e}")
+                return []
+        return await asyncio.to_thread(fetch)
+    else:
+        def fetch():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                if campeonato_id:
+                    cursor.execute("SELECT id, campeonato_id, nome, time, gols, assistencias, nota_media, jogos, criado_em FROM jogadores_liga WHERE campeonato_id = ? ORDER BY gols DESC, nota_media DESC", (campeonato_id,))
+                else:
+                    cursor.execute("SELECT id, campeonato_id, nome, time, gols, assistencias, nota_media, jogos, criado_em FROM jogadores_liga ORDER BY gols DESC, nota_media DESC")
+                rows = cursor.fetchall()
+                conn.close()
+                return [{
+                    "id": r[0], "campeonato_id": r[1], "nome": r[2], "time": r[3],
+                    "gols": r[4], "assistencias": r[5], "nota_media": float(r[6] or 0.0), "jogos": r[7],
+                    "criado_em": r[8]
+                } for r in rows]
+            except Exception as e:
+                print(f"Erro ao obter jogadores_liga local: {e}")
+                return []
+        return await asyncio.to_thread(fetch)
+
+
+async def save_jogador_liga(player_data: dict) -> bool:
+    if use_supabase:
+        def save():
+            try:
+                supabase_client.table("jogadores_liga").upsert(player_data).execute()
+                return True
+            except Exception as e:
+                print(f"Erro ao salvar jogador_liga Supabase: {e}")
+                return False
+        return await asyncio.to_thread(save)
+    else:
+        def save():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    """INSERT OR REPLACE INTO jogadores_liga (id, campeonato_id, nome, time, gols, assistencias, nota_media, jogos) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        player_data.get("id"),
+                        player_data.get("campeonato_id"),
+                        player_data.get("nome"),
+                        player_data.get("time"),
+                        player_data.get("gols", 0),
+                        player_data.get("assistencias", 0),
+                        player_data.get("nota_media", 0.0),
+                        player_data.get("jogos", 0)
+                    )
+                )
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                print(f"Erro ao salvar jogador_liga local: {e}")
+                return False
+        return await asyncio.to_thread(save)
+
+
+async def delete_jogador_liga(player_id: str) -> bool:
+    if use_supabase:
+        def remove():
+            try:
+                supabase_client.table("jogadores_liga").delete().eq("id", player_id).execute()
+                return True
+            except Exception as e:
+                print(f"Erro ao deletar jogador_liga: {e}")
+                return False
+        return await asyncio.to_thread(remove)
+    else:
+        def remove():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM jogadores_liga WHERE id = ?", (player_id,))
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                print(f"Erro ao deletar jogador_liga local: {e}")
                 return False
         return await asyncio.to_thread(remove)

@@ -29,3 +29,9 @@ SPECIFICATION.md
 # Coleções de assets locais não utilizadas pelo bot principal
 Colecao_Cartas/
 Colecao_Emojis/
+
+# Site público (não commitar no repo do bot)
+site_publico/
+
+# Imagens de cartas geradas localmente (salvas remotamente no ImgBB)
+static/cartas/

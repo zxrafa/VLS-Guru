@@ -1,0 +1,10 @@
+./simulation.py:265: # Estamina: escala de 50% (vazio) a 100% (cheio) sobre o atributo final
+.\cogs/economy.py:167: @app_commands.command(name="sobre", description="Exibe informações sobre o bot VLS Guru Reboot e seus desenvolvedores.")
+.\cogs/economy.py:168: async def sobre(self, interaction: discord.Interaction):
+.\cogs/economy.py:204: last_sobre = profile.get("last_sobre", 0)
+.\cogs/economy.py:205: if last_sobre > now:
+.\cogs/economy.py:206: last_sobre = 0
+.\cogs/economy.py:209: if now - last_sobre < 43200:
+.\cogs/economy.py:210: restante = 43200 - (now - last_sobre)
+.\cogs/economy.py:256: profile["last_sobre"] = now
+.\cogs/help.py:65: ("`/sobre`", "Informações sobre o VLS Guru e seus desenvolvedores."),

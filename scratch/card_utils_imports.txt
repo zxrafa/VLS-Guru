@@ -1,0 +1,14 @@
+./card_utils.py:123: def generate_player_card_sync(player_data):
+./main.py:289: from card_utils import generate_player_card_sync
+./main.py:290: card_path = await asyncio.to_thread(generate_player_card_sync, player_data)
+./main.py:331: from card_utils import generate_player_card_sync
+./main.py:332: card_path = await asyncio.to_thread(generate_player_card_sync, updated)
+.\scratch/migrate_and_shift_cards.py:12: # Adiciona o diretório principal ao sys.path para podermos importar card_utils
+.\scratch/migrate_and_shift_cards.py:15: from card_utils import generate_player_card_sync
+.\scratch/migrate_and_shift_cards.py:26: relative_path = generate_player_card_sync(player_data)
+.\scratch/patch_admin.py:142: card_path = await asyncio.to_thread(generate_player_card_sync, player_data)
+.\scratch/patch_admin.py:284: card_path = await asyncio.to_thread(generate_player_card_sync, p_data)
+.\scratch/patch_main.py:51: from card_utils import generate_player_card_sync
+.\scratch/patch_main.py:52: card_path = await asyncio.to_thread(generate_player_card_sync, player_data)
+.\scratch/patch_main.py:100: from card_utils import generate_player_card_sync
+.\scratch/patch_main.py:101: card_path = await asyncio.to_thread(generate_player_card_sync, updated)

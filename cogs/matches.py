@@ -1,0 +1,1182 @@
+# -*- coding: utf-8 -*-
+"""
+VLS Guru - Cog de Partidas e Campeonatos (Reboot)
+Gerencia desafios PvP, apostas, treinos contra CPU, rankings e torneios mata-mata.
+"""
+import discord
+from discord.ext import commands
+from discord import app_commands
+import random
+import time
+import asyncio
+
+from database import (
+    get_user_profile, save_user_profile,
+    get_all_users, db_get, db_upsert, db_delete,
+    get_user_lock,
+)
+from simulation import run_match_simulation, calculate_chemistry_bonus
+from config import VLS_COINS_EMOJI
+
+
+class MatchesCog(commands.Cog, name="Partidas"):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # HELPER: Processamento Pós-Jogo
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def process_match_results(
+        self,
+        interaction: discord.Interaction,
+        p1_user: discord.User,
+        p2_user: discord.User,
+        sim_res: dict,
+        wager: int = 0,
+    ) -> str:
+        """
+        Persiste o resultado da partida:
+          - Atualiza W/L/D e saldo dos perfis.
+          - Atualiza estatísticas das cartas APENAS no inventário (fonte da verdade),
+            depois sincroniza o starting_xi para refletir os mesmos objetos.
+          - Verifica conquistas secretas.
+          - Incrementa missões.
+        Retorna a mensagem de recompensa financeira para exibição.
+        """
+        p1_profile = await get_user_profile(p1_user)
+        p2_profile = await get_user_profile(p2_user)
+
+        p1_goals = sim_res["p1_goals"]
+        p2_goals = sim_res["p2_goals"]
+        perf     = sim_res["performance"]
+
+        # ── Resultado financeiro e placar ──────────────────────────────────────
+        if p1_goals > p2_goals:
+            p1_profile["wins"]   += 1
+            p2_profile["losses"] += 1
+            if wager > 0:
+                p1_profile["money"] += wager * 2
+                wager_msg = f"💸 **{p1_user.display_name}** venceu a aposta e faturou **R$ {wager * 2:,}**!"
+            else:
+                p1_profile["money"] += 5_000
+                p2_profile["money"] += 2_000
+                wager_msg = "💸 Mandante recebeu **R$ 5.000** e visitante **R$ 2.000** como bônus de amistoso."
+
+        elif p2_goals > p1_goals:
+            p2_profile["wins"]   += 1
+            p1_profile["losses"] += 1
+            if wager > 0:
+                p2_profile["money"] += wager * 2
+                wager_msg = f"💸 **{p2_user.display_name}** venceu a aposta e faturou **R$ {wager * 2:,}**!"
+            else:
+                p2_profile["money"] += 5_000
+                p1_profile["money"] += 2_000
+                wager_msg = "💸 Visitante recebeu **R$ 5.000** e mandante **R$ 2.000** como bônus de amistoso."
+
+        else:
+            p1_profile["draws"] += 1
+            p2_profile["draws"] += 1
+            if wager > 0:
+                p1_profile["money"] += wager
+                p2_profile["money"] += wager
+                wager_msg = "🤝 Empate. As apostas foram integralmente devolvidas a ambos os clubes."
+            else:
+                p1_profile["money"] += 3_000
+                p2_profile["money"] += 3_000
+                wager_msg = "🤝 Empate. Ambos os clubes receberam **R$ 3.000** de premiação."
+
+        # ── Conquista Secreta: Virada Histórica ───────────────────────────────
+        current_p1g = current_p2g = 0
+        p1_was_down_3 = p2_was_down_3 = False
+        for scorer in sim_res["scorers"]:
+            if scorer["team"] == 1:
+                current_p1g += 1
+            else:
+                current_p2g += 1
+            if (current_p2g - current_p1g) >= 3:
+                p1_was_down_3 = True
+            if (current_p1g - current_p2g) >= 3:
+                p2_was_down_3 = True
+
+        if p1_was_down_3 and p1_goals > p2_goals:
+            if "virada_historica" not in p1_profile.get("achievements", []):
+                p1_profile.setdefault("achievements", []).append("virada_historica")
+                p1_profile["premium_coins"] += 200
+                p1_profile.setdefault("acquired_badges", []).append("virada_historica")
+                await interaction.channel.send(
+                    f"🏆 **CONQUISTA SECRETA DESBLOQUEADA — {p1_user.mention}!**\n"
+                    f"✨ *Milagre em Campo* — Virada após estar perdendo por 3+ gols. Recompensa: **+200 VLS Coins**!"
+                )
+
+        if p2_was_down_3 and p2_goals > p1_goals:
+            if "virada_historica" not in p2_profile.get("achievements", []):
+                p2_profile.setdefault("achievements", []).append("virada_historica")
+                p2_profile["premium_coins"] += 200
+                p2_profile.setdefault("acquired_badges", []).append("virada_historica")
+                await interaction.channel.send(
+                    f"🏆 **CONQUISTA SECRETA DESBLOQUEADA — {p2_user.mention}!**\n"
+                    f"✨ *Milagre em Campo* — Virada após estar perdendo por 3+ gols. Recompensa: **+200 VLS Coins**!"
+                )
+
+        # ── Atualização de Estatísticas das Cartas ────────────────────────────
+        # Regra: atualiza APENAS o inventário (fonte da verdade) e depois
+        # ressincroniza o starting_xi por instance_id para evitar dupla contagem.
+
+        def _update_stats_in_list(card_list: list):
+            for card in card_list:
+                pid = card.get("instance_id")
+                if pid in perf:
+                    card["matches"] = card.get("matches", 0) + 1
+                    card["goals"]   = card.get("goals",   0) + perf[pid]["goals"]
+                    card["assists"] = card.get("assists", 0) + perf[pid]["assists"]
+                    card["saves"]   = card.get("saves",   0) + perf[pid]["saves"]
+                    card["xg"]      = card.get("xg",    0.0) + perf[pid]["xg"]
+                    card["xp"]      = card.get("xp",      0) + 1
+                    if perf[pid]["mvp"]:
+                        card["mvps"] = card.get("mvps", 0) + 1
+
+        # P1
+        _update_stats_in_list(p1_profile["inventory"])
+        # Ressincroniza starting_xi do P1 a partir do inventário atualizado
+        inv_p1_map = {c["instance_id"]: c for c in p1_profile["inventory"] if "instance_id" in c}
+        for slot in p1_profile.get("starting_xi", []):
+            pid = slot.get("instance_id")
+            if pid and pid in inv_p1_map:
+                # Copia só as chaves de estatísticas, preserva "pos" do slot
+                for stat_key in ("matches", "goals", "assists", "saves", "xg", "xp", "mvps"):
+                    slot[stat_key] = inv_p1_map[pid].get(stat_key, slot.get(stat_key, 0))
+
+        # P2
+        _update_stats_in_list(p2_profile["inventory"])
+        inv_p2_map = {c["instance_id"]: c for c in p2_profile["inventory"] if "instance_id" in c}
+        for slot in p2_profile.get("starting_xi", []):
+            pid = slot.get("instance_id")
+            if pid and pid in inv_p2_map:
+                for stat_key in ("matches", "goals", "assists", "saves", "xg", "xp", "mvps"):
+                    slot[stat_key] = inv_p2_map[pid].get(stat_key, slot.get(stat_key, 0))
+
+        # ── Missões ────────────────────────────────────────────────────────────
+        econ_cog = self.bot.get_cog("Economia")
+        if econ_cog:
+            await econ_cog.increment_mission(p1_user.id, p1_profile, "partidas", 1)
+            await econ_cog.increment_mission(p1_user.id, p1_profile, "gols", p1_goals)
+            if p1_goals > p2_goals:
+                await econ_cog.increment_mission(p1_user.id, p1_profile, "vitorias", 1)
+
+            await econ_cog.increment_mission(p2_user.id, p2_profile, "partidas", 1)
+            await econ_cog.increment_mission(p2_user.id, p2_profile, "gols", p2_goals)
+            if p2_goals > p1_goals:
+                await econ_cog.increment_mission(p2_user.id, p2_profile, "vitorias", 1)
+
+        # ── Persistência ───────────────────────────────────────────────────────
+        await save_user_profile(p1_user.id, p1_profile)
+        await save_user_profile(p2_user.id, p2_profile)
+
+        if econ_cog:
+            await econ_cog.check_achievements(p1_user.id, p1_profile, interaction)
+            await econ_cog.check_achievements(p2_user.id, p2_profile, interaction)
+
+        return wager_msg
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # HELPER: Exibição de Páginas de Simulação
+    # ──────────────────────────────────────────────────────────────────────────
+
+    async def show_simulation_pages(
+        self,
+        interaction: discord.Interaction,
+        p1_name: str,
+        p2_name: str,
+        sim_res: dict,
+        footer_msg: str,
+    ):
+        """Exibe a narração da partida ao vivo minuto a minuto e, no final, exibe o placar oficial com paginação."""
+        import re
+        import random
+        
+        logs = sim_res["narration"]
+        
+        # Configuração de ambientação (como o bot antigo)
+        estadios = [
+            "Estádio Olímpico Lluís Companys", "Estádio Nacional do Jamor", "Estádio VLS Arena",
+            "Camp Nou Virtual", "Santiago Bernabéu Retro", "Maracanã de Rua", "San Siro Classic",
+            "Estádio do Dragão", "Estádio da Luz"
+        ]
+        climas = [
+            {"nome": "Céu limpo", "emoji": "☀️"},
+            {"nome": "Nublado", "emoji": "☁️"},
+            {"nome": "Garoa", "emoji": "🌧️"},
+            {"nome": "Chuva Forte", "emoji": "⛈️"}
+        ]
+        
+        estadio = random.choice(estadios)
+        clima = random.choice(climas)
+
+        # --- PRELEÇÃO DE VESTIÁRIO ---
+        embed_pre = discord.Embed(
+            title="🏟️ VESTIÁRIO — Preleção e Aquecimento",
+            description=(
+                f"🏟️ **Estádio:** {estadio}\n"
+                f"{clima['emoji']} **Clima:** {clima['nome']}\n\n"
+                f"🔥 **Confronto:** **{p1_name}** x **{p2_name}**\n\n"
+                f"📢 **A bola vai rolar em instantes!** Os jogadores estão finalizando o aquecimento no gramado."
+            ),
+            color=discord.Color.blue()
+        )
+        embed_pre.set_footer(text="VLS TV • Ao Vivo")
+        
+        # Envia a preleção inicial
+        msg = await interaction.followup.send(embed=embed_pre)
+        await asyncio.sleep(5.0)
+
+        # --- SIMULAÇÃO TRANSMISSÃO AO VIVO ---
+        current_p1_goals = 0
+        current_p2_goals = 0
+        scorers_list = sim_res.get("scorers", [])
+        
+        # Rastreia os gols processados para exibição correta
+        scorers_tracked = []
+        for s in scorers_list:
+            scorers_tracked.append({
+                "minute": s.get("minute", 0),
+                "team": s.get("team", 1),
+                "processed": False
+            })
+
+        recent_plays = []
+        first_half_done = False
+        
+        def parse_minute(log_line: str) -> int:
+            m = re.search(r"⏱️ \*\*(\d+)'\*\*", log_line)
+            return int(m.group(1)) if m else 0
+
+        for play in logs:
+            minuto = parse_minute(play)
+            
+            # Atualiza o placar ao vivo conforme os gols cadastrados nesse minuto
+            for s in scorers_tracked:
+                if s["minute"] == minuto and not s["processed"]:
+                    s["processed"] = True
+                    if s["team"] == 1:
+                        current_p1_goals += 1
+                    else:
+                        current_p2_goals += 1
+
+            # Transição de Intervalo
+            if minuto > 45 and not first_half_done:
+                first_half_done = True
+                embed_interval = discord.Embed(
+                    title="🟡 INTERVALO — VLS TV",
+                    description=(
+                        f"🏠 **{p1_name}**  `{current_p1_goals} — {current_p2_goals}`  ✈️ **{p2_name}**\n\n"
+                        f"⏸️ O árbitro apita o fim do primeiro tempo! Jogadores vão para o vestiário descansar."
+                    ),
+                    color=discord.Color.gold()
+                )
+                embed_interval.set_footer(text="VLS TV • Ao Vivo")
+                await msg.edit(embed=embed_interval)
+                await asyncio.sleep(5.0)
+
+            # Adiciona o lance na lista de recentes
+            recent_plays.append(play)
+            if len(recent_plays) > 4:
+                recent_plays.pop(0)
+
+            # Barra de progresso visual
+            filled = int((minuto / 90.0) * 16)
+            progress_bar = "█" * filled + "░" * (16 - filled)
+            
+            recent_text = "\n\n".join(recent_plays)
+            tempo_nome = "1º Tempo" if minuto <= 45 else "2º Tempo"
+            
+            embed_live = discord.Embed(
+                title=f"🎙️ TRANSMISSÃO AO VIVO — VLS TV | {tempo_nome}",
+                description=(
+                    f"🏟️ **Estádio:** {estadio} | {clima['emoji']} **Clima:** {clima['nome']}\n\n"
+                    f"🏠 **{p1_name}**  `{current_p1_goals} — {current_p2_goals}`  ✈️ **{p2_name}**\n\n"
+                    f"⏱️ **Tempo:** `[{progress_bar}] {minuto}'`\n\n"
+                    f"**Últimos lances:**\n"
+                    f"{recent_text}"
+                ),
+                color=discord.Color.blue()
+            )
+            
+            # Destaca gols mudando a cor do embed para verde
+            if "⚽" in play or "GOOOL" in play:
+                embed_live.color = discord.Color.brand_green()
+
+            await msg.edit(embed=embed_live)
+            await asyncio.sleep(3.5)
+
+        # --- APITO FINAL LIVE ---
+        embed_apito = discord.Embed(
+            title="🏁 APITO FINAL!",
+            description=(
+                f"🏠 **{p1_name}**  `{current_p1_goals} — {current_p2_goals}`  ✈️ **{p2_name}**\n\n"
+                f"📢 **Fim de jogo!** O árbitro encerra a partida sob vaias e aplausos dos torcedores!"
+            ),
+            color=discord.Color.red()
+        )
+        embed_apito.set_footer(text="VLS TV • Ao Vivo")
+        await msg.edit(embed=embed_apito)
+        await asyncio.sleep(4.0)
+
+        # --- PREPARA RELATÓRIO FINAL COM BOTOES E PAGINAÇÃO ---
+        lines_per_page = 8
+        pages          = [logs[i : i + lines_per_page] for i in range(0, max(1, len(logs)), lines_per_page)]
+
+        narr_embeds = []
+        for idx, page in enumerate(pages):
+            embed = discord.Embed(
+                title       = f"🏟️ {p1_name}  vs  {p2_name} — Reprise de Lances",
+                description = "\n\n".join(page) if page else "*Partida sem lances registrados.*",
+                color       = discord.Color.dark_theme(),
+            )
+            embed.set_footer(text=f"Página {idx + 1}/{len(pages)} • VLS Guru Match Engine")
+            narr_embeds.append(embed)
+
+        p1g    = sim_res["p1_goals"]
+        p2g    = sim_res["p2_goals"]
+        stats  = sim_res["stats"]
+        xg     = sim_res["xg"]
+        mvp    = sim_res["mvp"]
+
+        final_embed = discord.Embed(
+            title       = "🏁 PLACAR OFICIAL — Estatísticas & Prêmios",
+            description = f"🏠 **{p1_name}**  `{p1g} — {p2g}`  ✈️ **{p2_name}**",
+            color       = discord.Color.brand_green() if p1g != p2g else discord.Color.greyple(),
+        )
+        final_embed.add_field(
+            name  = "📊 Estatísticas da Partida",
+            value = (
+                f"👟 **Chutes (no Alvo):** {stats['p1']['shots']} ({stats['p1']['on_target']}) vs "
+                f"{stats['p2']['shots']} ({stats['p2']['on_target']})\n"
+                f"🧤 **Defesas do Goleiro:** {stats['p1']['saves']} vs {stats['p2']['saves']}\n"
+                f"🚩 **Escanteios:** {stats['p1']['corners']} vs {stats['p2']['corners']}\n"
+                f"⚠️ **Faltas:** {stats['p1']['fouls']} vs {stats['p2']['fouls']}\n"
+                f"🟨 **Amarelos:** {stats['p1']['yellow']} vs {stats['p2']['yellow']}\n"
+                f"🟥 **Vermelhos:** {stats['p1']['red']} vs {stats['p2']['red']}\n"
+                f"📈 **xG Acumulado:** {xg['p1']:.2f} vs {xg['p2']:.2f}\n"
+                f"👑 **Melhor em Campo (MVP):** **{mvp}**"
+            ),
+            inline=False,
+        )
+        final_embed.add_field(name="💰 Recompensas & Resultado Financeiro", value=footer_msg, inline=False)
+
+        view = MatchReportView(narr_embeds, final_embed)
+        await msg.edit(embed=final_embed, view=view)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # COMANDOS: PARTIDAS PvP
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @app_commands.command(name="desafio", description="Desafia outro membro para um amistoso de futebol.")
+    @app_commands.describe(usuario="O clube que você deseja enfrentar")
+    async def desafio(self, interaction: discord.Interaction, usuario: discord.User):
+        if usuario.id == interaction.user.id:
+            return await interaction.response.send_message("❌ Você não pode desafiar a si mesmo.", ephemeral=True)
+        if usuario.bot:
+            return await interaction.response.send_message("❌ Bots não podem participar de partidas.", ephemeral=True)
+
+        p1_profile = await get_user_profile(interaction.user)
+        p2_profile = await get_user_profile(usuario)
+
+        if len(p1_profile.get("starting_xi", [])) < 11:
+            return await interaction.response.send_message("❌ Seu clube precisa de 11 titulares escalados. Use `/escalar`.", ephemeral=True)
+        if len(p2_profile.get("starting_xi", [])) < 11:
+            return await interaction.response.send_message("❌ O adversário desafiado não possui 11 titulares escalados.", ephemeral=True)
+
+        view = ChallengeResponseView(interaction.user, usuario, self, wager=0)
+        await interaction.response.send_message(
+            f"⚔️ **DESAFIO LANÇADO!** {interaction.user.mention} desafia {usuario.mention} para um confronto amistoso!\n"
+            f"*{usuario.display_name}, clique em **Aceitar** para confirmar o confronto.*",
+            view=view,
+        )
+
+    @app_commands.command(name="x1_aposta", description="Desafia outro membro para uma partida com aposta em dinheiro.")
+    @app_commands.describe(usuario="O adversário desafiado", aposta="Valor apostado por cada clube (R$)")
+    async def x1_aposta(self, interaction: discord.Interaction, usuario: discord.User, aposta: int):
+        if usuario.id == interaction.user.id:
+            return await interaction.response.send_message("❌ Operação inválida.", ephemeral=True)
+        if usuario.bot:
+            return await interaction.response.send_message("❌ Bots não aceitam apostas.", ephemeral=True)
+        if aposta <= 0:
+            return await interaction.response.send_message("❌ O valor da aposta deve ser positivo.", ephemeral=True)
+
+        p1_profile = await get_user_profile(interaction.user)
+        p2_profile = await get_user_profile(usuario)
+
+        if p1_profile.get("money", 0) < aposta:
+            return await interaction.response.send_message(f"❌ Seu saldo é insuficiente para apostar R$ {aposta:,}.", ephemeral=True)
+        if p2_profile.get("money", 0) < aposta:
+            return await interaction.response.send_message("❌ O adversário não possui fundos suficientes para cobrir a aposta.", ephemeral=True)
+        if len(p1_profile.get("starting_xi", [])) < 11 or len(p2_profile.get("starting_xi", [])) < 11:
+            return await interaction.response.send_message("❌ Ambos os clubes precisam ter 11 titulares escalados.", ephemeral=True)
+
+        view = ChallengeResponseView(interaction.user, usuario, self, wager=aposta)
+        await interaction.response.send_message(
+            f"⚔️ **X1 APOSTADO!** {interaction.user.mention} desafia {usuario.mention} por **R$ {aposta:,}** de cada clube!\n"
+            f"*(O vencedor leva o prêmio total de **R$ {aposta * 2:,}**)*\n"
+            f"*{usuario.display_name}, você tem 60 segundos para aceitar.*",
+            view=view,
+        )
+
+    @app_commands.command(name="treino", description="Realiza um treino contra a CPU para aumentar a afinidade dos titulares (cooldown: 5 min).")
+    async def treino(self, interaction: discord.Interaction):
+        profile     = await get_user_profile(interaction.user)
+        starting_xi = profile.get("starting_xi", [])
+
+        if len(starting_xi) < 11:
+            return await interaction.response.send_message("❌ Você precisa de 11 titulares escalados para treinar.", ephemeral=True)
+
+        now      = int(time.time())
+        last_t   = profile.get("last_treino", 0)
+        cooldown = 300  # 5 minutos
+
+        if now - last_t < cooldown:
+            remaining = cooldown - (now - last_t)
+            minutos = remaining // 60
+            segundos = remaining % 60
+            return await interaction.response.send_message(
+                f"⏳ Seu elenco ainda está em recuperação. Aguarde **{minutos}m {segundos}s** para o próximo treino.",
+                ephemeral=True,
+            )
+
+        await interaction.response.defer()
+        profile["last_treino"] = now
+
+        # Calcula o OVR médio do time do jogador
+        xi_ovrs = [p.get("over", 70) for p in starting_xi]
+        avg_ovr = int(sum(xi_ovrs) / max(1, len(xi_ovrs)))
+
+        # Gera time CPU com OVR proporcional ao do jogador (±10% de variação)
+        from database import get_all_players as _get_all_players
+        all_players = await _get_all_players()
+
+        cpu_positions = ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CDM", "LW", "RW", "ST"]
+
+        if all_players and len(all_players) >= 5:
+            # Usa jogadores reais como base e varia o OVR ±10%
+            import random as _rnd
+            cpu_xi = []
+            pool = all_players * 3  # replica para ter jogadores suficientes
+            _rnd.shuffle(pool)
+            used_ids = set()
+            for i, cpu_pos in enumerate(cpu_positions):
+                candidates = [p for p in pool if p.get("id") not in used_ids]
+                if candidates:
+                    base_player = _rnd.choice(candidates[:15])
+                    used_ids.add(base_player.get("id"))
+                else:
+                    base_player = _rnd.choice(pool)
+
+                # OVR do adversario varia dentro de +-10% do avg_ovr do jogador
+                variation = int(avg_ovr * 0.10)
+                cpu_ovr = max(50, min(99, avg_ovr + _rnd.randint(-variation, variation)))
+
+                # Atributos derivados do OVR ajustado
+                base_stat = max(50, cpu_ovr - 5)
+                cpu_xi.append({
+                    "instance_id": f"cpu_{i}",
+                    "name": f"CPU {base_player.get('name', 'Jogador')[:12]}",
+                    "over": cpu_ovr,
+                    "pos": cpu_pos,
+                    "shoot":    base_player.get("shoot", base_stat),
+                    "pass_stat":base_player.get("pass_stat", base_stat),
+                    "dribble":  base_player.get("dribble", base_stat),
+                    "defense":  base_player.get("defense", base_stat),
+                    "physical": base_player.get("physical", base_stat),
+                    "weak_foot":   base_player.get("weak_foot", 3),
+                    "skill_moves": base_player.get("skill_moves", 2),
+                    "playstyles":  [],
+                    "nationality": "CPU",
+                    "club":        "CPU FC",
+                    "xp":          0,
+                })
+        else:
+            # Fallback se não houver jogadores cadastrados
+            cpu_names = ["Araújo","Mendes","Carvalho","Ribeiro","Nunes","Teixeira","Barros","Cardoso","Moreira","Pinto","Sousa"]
+            variation = int(avg_ovr * 0.10)
+            cpu_xi = [
+                {
+                    "instance_id": f"cpu_{i}",
+                    "name":        f"CPU {cpu_names[i]}",
+                    "over":        max(50, min(99, avg_ovr + random.randint(-variation, variation))),
+                    "pos":         cpu_positions[i],
+                    "shoot":       max(50, avg_ovr - 5),
+                    "pass_stat":   max(50, avg_ovr - 5),
+                    "dribble":     max(50, avg_ovr - 5),
+                    "defense":     max(50, avg_ovr - 5),
+                    "physical":    max(50, avg_ovr - 5),
+                    "weak_foot":   random.randint(2, 4),
+                    "skill_moves": random.randint(1, 3),
+                    "playstyles":  [],
+                    "nationality": "CPU",
+                    "club":        "CPU FC",
+                    "xp":          0,
+                }
+                for i in range(11)
+            ]
+
+        p1_chem  = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
+        cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+
+        sim_res = run_match_simulation(
+            p1_name   = profile["club_name"],
+            p2_name   = "CPU — Treino",
+            p1_xi     = starting_xi,
+            p2_xi     = cpu_xi,
+            p1_tactic = profile.get("tactic", "padrao"),
+            p2_tactic = "padrao",
+            p1_chem   = p1_chem,
+            p2_chem   = cpu_chem,
+        )
+
+        # Recompensa fixa de treino: R$ 3.000 + +1 XP de afinidade por titular
+        profile["money"] += 3_000
+        starting_ids = {p["instance_id"] for p in starting_xi}
+
+        # Atualiza APENAS o inventário (fonte da verdade)
+        for card in profile["inventory"]:
+            if card.get("instance_id") in starting_ids:
+                card["xp"] = card.get("xp", 0) + 1
+
+        # Ressincroniza starting_xi
+        inv_map = {c["instance_id"]: c for c in profile["inventory"] if "instance_id" in c}
+        for slot in profile["starting_xi"]:
+            pid = slot.get("instance_id")
+            if pid and pid in inv_map:
+                slot["xp"] = inv_map[pid].get("xp", slot.get("xp", 0))
+
+        await save_user_profile(interaction.user.id, profile)
+
+        footer_msg = "💸 **Recompensa de Treino:** R$ 3.000 creditados | Todos os titulares ganharam **+1 XP de Afinidade**."
+        await self.show_simulation_pages(interaction, profile["club_name"], "CPU — Treino", sim_res, footer_msg)
+
+    @app_commands.command(name="ranking", description="Exibe a classificação geral dos clubes do servidor.")
+    @app_commands.describe(criterio="Ordenar o ranking por este critério")
+    @app_commands.choices(criterio=[
+        app_commands.Choice(name="Vitórias",    value="vitorias"),
+        app_commands.Choice(name="Dinheiro",    value="dinheiro"),
+        app_commands.Choice(name="Conquistas",  value="conquistas"),
+    ])
+    async def ranking(self, interaction: discord.Interaction, criterio: str = "vitorias"):
+        users = await get_all_users()
+        if not users:
+            return await interaction.response.send_message("❌ Nenhum clube registrado no sistema.", ephemeral=True)
+
+        if criterio == "dinheiro":
+            users.sort(key=lambda u: u.get("money", 0), reverse=True)
+            label = "💵 Saldo em Caixa"
+            lines = [
+                f"**#{i + 1}** {u.get('club_name', 'FC')} — R$ {u.get('money', 0):,}"
+                for i, u in enumerate(users[:10])
+            ]
+        elif criterio == "conquistas":
+            users.sort(key=lambda u: len(u.get("achievements", [])), reverse=True)
+            label = "🏆 Conquistas Desbloqueadas"
+            lines = [
+                f"**#{i + 1}** {u.get('club_name', 'FC')} — {len(u.get('achievements', []))} conquistas"
+                for i, u in enumerate(users[:10])
+            ]
+        else:
+            users.sort(key=lambda u: u.get("wins", 0), reverse=True)
+            label = "🛡️ Vitórias"
+            lines = [
+                f"**#{i + 1}** {u.get('club_name', 'FC')} — {u.get('wins', 0)}V / {u.get('losses', 0)}D"
+                for i, u in enumerate(users[:10])
+            ]
+
+        embed = discord.Embed(
+            title       = f"📊 Ranking Global — Top 10 por {label}",
+            description = "\n".join(lines) if lines else "Nenhum dado disponível.",
+            color       = discord.Color.gold(),
+        )
+        embed.set_footer(text="VLS Guru Leaderboard • Atualizado em tempo real")
+        await interaction.response.send_message(embed=embed)
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # COMANDOS: CAMPEONATO MATA-MATA
+    # ──────────────────────────────────────────────────────────────────────────
+
+    @app_commands.command(name="campeonato_admin", description="[Admin] Dashboard central para gerenciar campeonatos.")
+    async def campeonato_admin(self, interaction: discord.Interaction):
+        """Dashboard centralizado para criacao, visualizacao, cancelamento e inicio de campeonato."""
+        ALLOWED_IDS = {338704196180115458, 1411893056516391034, 792144300666126336}
+        is_admin = (
+            interaction.user.guild_permissions.administrator
+            or interaction.user.id in ALLOWED_IDS
+        )
+        if not is_admin:
+            return await interaction.response.send_message("❌ Apenas administradores.", ephemeral=True)
+
+        doc_id = f"champ_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        champ = record["data"] if record else None
+
+        status = champ.get("status", "waiting") if champ else "none"
+        parts_count = len(champ.get("participants", [])) if champ else 0
+        rodada = champ.get("round", 0) if champ else 0
+
+        embed = discord.Embed(
+            title="🏆 Dashboard de Campeonatos",
+            color=discord.Color.gold()
+        )
+        if not champ:
+            embed.description = "⚠️ Nenhum campeonato ativo. Crie um novo abaixo."
+        elif status == "waiting":
+            embed.description = f"📋 **Status:** Inscrições abertas | **Participantes:** {parts_count}"
+        elif status == "active":
+            embed.description = f"⚔️ **Status:** Em andamento | **Rodada:** {rodada} | **Participantes:** {parts_count}"
+        else:
+            embed.description = f"Status: `{status}`"
+
+        embed.add_field(
+            name="✅ Ações Disponíveis",
+            value=(
+                "🏃 **Criar** — Abre um novo campeonato com inscrições\n"
+                "🗡️ **Iniciar** — Começa as rodadas (fecha inscrições)\n"
+                "⏭️ **Rodar Jogo** — Simula a rodada atual\n"
+                "🗑️ **Cancelar** — Encerra e apaga o campeonato (dupla confirmação)"
+            ),
+            inline=False
+        )
+        embed.set_footer(text="Dashboard restrito a administradores")
+
+        view = CampeonatoAdminView(interaction.user.id, interaction.guild.id, self, champ)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+    @app_commands.command(name="campeonato", description="Exibe o chaveamento e status do campeonato ativo.")
+    async def campeonato(self, interaction: discord.Interaction):
+        doc_id = f"champ_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhum campeonato ativo neste servidor.", ephemeral=True)
+
+        champ  = record["data"]
+        status = champ.get("status", "waiting")
+        embed  = discord.Embed(title="🏆 Central do Torneio VLS Guru", color=discord.Color.gold())
+
+        if status == "waiting":
+            lines = []
+            for idx, pid in enumerate(champ["participants"]):
+                member = interaction.guild.get_member(pid)
+                lines.append(f"{idx + 1}. {member.display_name if member else f'Membro #{pid}'}")
+            embed.description = "📋 **Fase de Inscrição** — Clique no botão abaixo para participar!"
+            embed.add_field(
+                name  = f"Participantes Inscritos ({len(champ['participants'])})",
+                value = "\n".join(lines) if lines else "Nenhum participante ainda.",
+                inline=False,
+            )
+            view = ParticipateView(interaction.guild.id)
+            return await interaction.response.send_message(embed=embed, view=view)
+
+        elif status == "active":
+            embed.description = f"⚔️ **Rodada {champ.get('round', 1)} em Andamento**"
+            match_lines = []
+            for idx, m in enumerate(champ["matches"]):
+                p1_m = interaction.guild.get_member(m["p1"])
+                p2_m = interaction.guild.get_member(m["p2"])
+                p1_name = p1_m.display_name if p1_m else "Mandante"
+                p2_name = p2_m.display_name if p2_m else "Visitante"
+                if "p1_goals" in m:
+                    winner_mention = f"<@{m['winner']}>"
+                    match_lines.append(
+                        f"**Jogo #{idx + 1}:** {p1_name} `{m['p1_goals']} — {m['p2_goals']}` {p2_name} — Vencedor: {winner_mention}"
+                    )
+                else:
+                    match_lines.append(f"**Jogo #{idx + 1}:** {p1_name} vs {p2_name} *(Aguardando simulação)*")
+            embed.add_field(
+                name  = "Confrontos da Rodada",
+                value = "\n".join(match_lines) if match_lines else "Nenhum confronto gerado.",
+                inline=False,
+            )
+
+        else:
+            embed.description = "✅ Torneio concluído ou cancelado."
+
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="rodar_jogo", description="[Torneio] Simula os confrontos pendentes da rodada atual.")
+    async def rodar_jogo(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Apenas administradores.", ephemeral=True)
+
+        doc_id = f"champ_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhum campeonato ativo.", ephemeral=True)
+
+        champ = record["data"]
+
+        # ── Fase de espera: gera o primeiro chaveamento ────────────────────────
+        if champ.get("status") == "waiting":
+            parts = list(champ["participants"])
+            if len(parts) < 2:
+                return await interaction.response.send_message(
+                    "❌ São necessários no mínimo **2 participantes** para iniciar o chaveamento.", ephemeral=True
+                )
+            random.shuffle(parts)
+            bye_player = None
+            if len(parts) % 2 != 0:
+                bye_player = parts.pop()
+            matches = [{"p1": parts[i], "p2": parts[i + 1]} for i in range(0, len(parts), 2)]
+
+            champ.update({"status": "active", "round": 1, "matches": matches, "bye_player": bye_player})
+            await db_upsert(doc_id, champ)
+            return await interaction.response.send_message(
+                "⚔️ **Chaveamento Gerado!** Rodada 1 criada com sucesso.\n"
+                "Consulte os confrontos com `/campeonato` e rode os jogos executando `/rodar_jogo` novamente."
+            )
+
+        # ── Fase ativa: simula confrontos pendentes ────────────────────────────
+        if champ.get("status") == "active":
+            await interaction.response.defer()
+
+            has_pending = any("p1_goals" not in m for m in champ["matches"])
+
+            if not has_pending:
+                # Todos simulados → avança de fase ou coroa campeão
+                winners = [m["winner"] for m in champ["matches"]]
+                if champ.get("bye_player"):
+                    winners.append(champ["bye_player"])
+
+                if len(winners) == 1:
+                    champ["status"] = "finished"
+                    await db_upsert(doc_id, champ)
+                    winner_id     = winners[0]
+                    winner_member = interaction.guild.get_member(winner_id)
+                    if winner_member:
+                        winner_profile = await get_user_profile(winner_member)
+                        winner_profile["money"]         += 150_000
+                        winner_profile["premium_coins"] += 100
+                        winner_profile.setdefault("achievements", [])
+                        if "titulo_primeiro" not in winner_profile["achievements"]:
+                            winner_profile["achievements"].append("titulo_primeiro")
+                        await save_user_profile(winner_id, winner_profile)
+
+                    embed_win = discord.Embed(
+                        title       = "🏆 CAMPEÃO DO TORNEIO VLS GURU!",
+                        description = (
+                            f"👑 **{winner_member.mention if winner_member else f'<@{winner_id}>'}** "
+                            f"se consagrou **campeão** após uma disputa épica!\n\n"
+                            f"💰 **Premiação da Taça:**\n"
+                            f"• R$ 150.000 depositados no clube vencedor\n"
+                            f"• +100 VLS Coins de bônus exclusivo"
+                        ),
+                        color=discord.Color.gold(),
+                    )
+                    return await interaction.followup.send(embed=embed_win)
+
+                # Próxima fase
+                random.shuffle(winners)
+                bye_player = None
+                if len(winners) % 2 != 0:
+                    bye_player = winners.pop()
+                new_matches = [{"p1": winners[i], "p2": winners[i + 1]} for i in range(0, len(winners), 2)]
+                champ["round"]      += 1
+                champ["matches"]     = new_matches
+                champ["bye_player"]  = bye_player
+                await db_upsert(doc_id, champ)
+                return await interaction.followup.send(
+                    f"✅ Rodada anterior concluída! Chaveamento da **Rodada {champ['round']}** gerado. Use `/campeonato`."
+                )
+
+            # Simula confrontos pendentes desta rodada
+            for m in champ["matches"]:
+                if "p1_goals" in m:
+                    continue  # Já simulado
+
+                p1_m = interaction.guild.get_member(m["p1"])
+                p2_m = interaction.guild.get_member(m["p2"])
+
+                if not p1_m or not p2_m:
+                    # W.O. — avança quem está presente
+                    m["p1_goals"] = 0
+                    m["p2_goals"] = 0
+                    m["winner"]   = m["p1"] if p1_m else m["p2"]
+                    await interaction.followup.send(
+                        f"⚠️ **W.O.:** Um dos participantes não está mais no servidor. O confronto foi encerrado por ausência."
+                    )
+                    continue
+
+                p1_prof = await get_user_profile(p1_m)
+                p2_prof = await get_user_profile(p2_m)
+
+                if len(p1_prof.get("starting_xi", [])) < 11 or len(p2_prof.get("starting_xi", [])) < 11:
+                    m["p1_goals"] = 0
+                    m["p2_goals"] = 0
+                    m["winner"]   = m["p1"] if len(p1_prof.get("starting_xi", [])) >= 11 else m["p2"]
+                    await interaction.followup.send(
+                        f"⚠️ **W.O.:** Um dos clubes não possui 11 titulares escalados. Vitória por ausência concedida."
+                    )
+                    continue
+
+                p1_chem = calculate_chemistry_bonus(p1_prof["starting_xi"], p1_prof.get("formation", "4-3-3"))
+                p2_chem = calculate_chemistry_bonus(p2_prof["starting_xi"], p2_prof.get("formation", "4-3-3"))
+
+                sim = run_match_simulation(
+                    p1_name   = p1_prof["club_name"],
+                    p2_name   = p2_prof["club_name"],
+                    p1_xi     = p1_prof["starting_xi"],
+                    p2_xi     = p2_prof["starting_xi"],
+                    p1_tactic = p1_prof.get("tactic", "padrao"),
+                    p2_tactic = p2_prof.get("tactic", "padrao"),
+                    p1_chem   = p1_chem,
+                    p2_chem   = p2_chem,
+                )
+
+                m["p1_goals"] = sim["p1_goals"]
+                m["p2_goals"] = sim["p2_goals"]
+                # Empate no torneio: avança o mandante
+                m["winner"]   = m["p1"] if sim["p1_goals"] >= sim["p2_goals"] else m["p2"]
+
+                await self.process_match_results(interaction, p1_m, p2_m, sim)
+
+                await interaction.followup.send(
+                    f"⚔️ **{p1_prof['club_name']}** `{sim['p1_goals']} — {sim['p2_goals']}` **{p2_prof['club_name']}** "
+                    f"→ Avança: <@{m['winner']}>"
+                )
+                await asyncio.sleep(1)
+
+            await db_upsert(doc_id, champ)
+            await interaction.followup.send(
+                "🎮 **Todos os confrontos desta rodada foram simulados!**\n"
+                "Execute `/rodar_jogo` novamente para avançar para a próxima fase."
+            )
+
+        else:
+            await interaction.response.send_message("❌ O campeonato não está em um estado ativo. Use `/criar_campeonato`.", ephemeral=True)
+
+    @app_commands.command(name="cancelar_campeonato", description="[Torneio] Cancela e apaga os dados do campeonato corrente.")
+    async def cancelar_campeonato(self, interaction: discord.Interaction):
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.response.send_message("❌ Apenas administradores.", ephemeral=True)
+
+        doc_id = f"champ_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhum campeonato ativo para cancelar.", ephemeral=True)
+
+        await db_delete(doc_id)
+        await interaction.response.send_message(
+            "🚨 **Campeonato Cancelado.** Todos os dados do torneio desta edição foram removidos."
+        )
+
+
+# ==============================================================================
+# VIEWS
+# ==============================================================================
+
+class ChallengeResponseView(discord.ui.View):
+    """View para aceitar ou recusar um desafio PvP (amistoso ou apostado)."""
+
+    def __init__(self, challenger: discord.User, target: discord.User, cog: MatchesCog, wager: int = 0):
+        super().__init__(timeout=60)
+        self.challenger = challenger
+        self.target     = target
+        self.cog        = cog
+        self.wager      = wager
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(content="⏳ O desafio expirou — nenhuma resposta foi dada.", view=self)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Aceitar Desafio", style=discord.ButtonStyle.success, emoji="⚔️")
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            return await interaction.response.send_message("❌ Apenas o usuário desafiado pode aceitar o confronto.", ephemeral=True)
+
+        await interaction.response.defer()
+        for child in self.children:
+            child.disabled = True
+        await interaction.message.edit(view=self)
+        self.stop()
+
+        p1_profile = await get_user_profile(self.challenger)
+        p2_profile = await get_user_profile(self.target)
+
+        # Re-validação de saldo (pode ter mudado desde o envio)
+        if self.wager > 0:
+            if p1_profile.get("money", 0) < self.wager:
+                return await interaction.followup.send("❌ Desafio cancelado: o desafiador não possui saldo suficiente.")
+            if p2_profile.get("money", 0) < self.wager:
+                return await interaction.followup.send("❌ Desafio cancelado: saldo insuficiente para cobrir a aposta.")
+
+            # Debita de ambos com lock para segurança
+            async with get_user_lock(self.challenger.id):
+                p1_fresh = await get_user_profile(self.challenger)
+                if p1_fresh.get("money", 0) < self.wager:
+                    return await interaction.followup.send("❌ Saldo do desafiador mudou. Desafio cancelado.")
+                p1_fresh["money"] -= self.wager
+                await save_user_profile(self.challenger.id, p1_fresh)
+
+            async with get_user_lock(self.target.id):
+                p2_fresh = await get_user_profile(self.target)
+                if p2_fresh.get("money", 0) < self.wager:
+                    # Devolve ao P1
+                    async with get_user_lock(self.challenger.id):
+                        p1_refund = await get_user_profile(self.challenger)
+                        p1_refund["money"] += self.wager
+                        await save_user_profile(self.challenger.id, p1_refund)
+                    return await interaction.followup.send("❌ Saldo do adversário é insuficiente. Aposta cancelada e valores devolvidos.")
+                p2_fresh["money"] -= self.wager
+                await save_user_profile(self.target.id, p2_fresh)
+
+            # Recarrega perfis frescos para a simulação
+            p1_profile = await get_user_profile(self.challenger)
+            p2_profile = await get_user_profile(self.target)
+
+        p1_xi   = p1_profile.get("starting_xi", [])
+        p2_xi   = p2_profile.get("starting_xi", [])
+        p1_chem = calculate_chemistry_bonus(p1_xi, p1_profile.get("formation", "4-3-3"))
+        p2_chem = calculate_chemistry_bonus(p2_xi, p2_profile.get("formation", "4-3-3"))
+
+        sim_res = run_match_simulation(
+            p1_name   = p1_profile.get("club_name", "Mandante"),
+            p2_name   = p2_profile.get("club_name", "Visitante"),
+            p1_xi     = p1_xi,
+            p2_xi     = p2_xi,
+            p1_tactic = p1_profile.get("tactic", "padrao"),
+            p2_tactic = p2_profile.get("tactic", "padrao"),
+            p1_chem   = p1_chem,
+            p2_chem   = p2_chem,
+        )
+
+        wager_msg = await self.cog.process_match_results(interaction, self.challenger, self.target, sim_res, self.wager)
+        await self.cog.show_simulation_pages(
+            interaction = interaction,
+            p1_name     = p1_profile["club_name"],
+            p2_name     = p2_profile["club_name"],
+            sim_res     = sim_res,
+            footer_msg  = wager_msg,
+        )
+
+    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.danger, emoji="❌")
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            return await interaction.response.send_message("❌ Apenas o usuário desafiado pode recusar.", ephemeral=True)
+
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(
+            content=f"❌ {self.target.mention} recusou o confronto. O desafio foi encerrado.",
+            view=self,
+        )
+        self.stop()
+
+
+class MatchReportView(discord.ui.View):
+    """View com paginação para navegar pelos lances da partida e acessar o placar final."""
+
+    def __init__(self, embeds: list, final_embed: discord.Embed):
+        super().__init__(timeout=300)
+        self.embeds       = embeds
+        self.final_embed  = final_embed
+        self.current_page = 0
+
+    async def on_timeout(self):
+        for item in self.children:
+            item.disabled = True
+        try:
+            await self.message.edit(view=self)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="◀️ Anterior", style=discord.ButtonStyle.blurple)
+    async def prev(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page > 0:
+            self.current_page -= 1
+            await interaction.response.edit_message(embed=self.embeds[self.current_page])
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="Próximo ▶️", style=discord.ButtonStyle.blurple)
+    async def next(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if self.current_page < len(self.embeds) - 1:
+            self.current_page += 1
+            await interaction.response.edit_message(embed=self.embeds[self.current_page])
+        elif self.current_page == len(self.embeds) - 1:
+            self.current_page += 1
+            await interaction.response.edit_message(embed=self.final_embed)
+        else:
+            await interaction.response.defer()
+
+    @discord.ui.button(label="🏁 Placar Final", style=discord.ButtonStyle.success)
+    async def go_to_final(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.current_page = len(self.embeds)
+        await interaction.response.edit_message(embed=self.final_embed)
+
+
+# ══════════════════════════════════════════════════════════
+# Dashboard Admin de Campeonatos
+# ══════════════════════════════════════════════════════════
+
+class CampeonatoAdminView(discord.ui.View):
+    def __init__(self, owner_id: int, guild_id: int, cog, champ: dict | None):
+        super().__init__(timeout=180)
+        self.owner_id = owner_id
+        self.guild_id = guild_id
+        self.cog = cog
+        self.champ = champ
+        self.canceling = False
+
+    @discord.ui.button(label="🏃 Criar Campeonato", style=discord.ButtonStyle.success, row=0)
+    async def criar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+
+        doc_id = f"champ_{self.guild_id}"
+        existing = await db_get(doc_id)
+        if existing and existing["data"].get("status") in ("waiting", "active"):
+            return await interaction.response.send_message(
+                "❌ Já existe um campeonato ativo. Cancele-o primeiro.", ephemeral=True
+            )
+
+        await db_upsert(doc_id, {
+            "id": doc_id,
+            "participants": [],
+            "status": "waiting",
+            "matches": [],
+            "round": 0,
+            "bye_player": None,
+        })
+
+        # Envia mensagem pública com botão de participar
+        embed = discord.Embed(
+            title="🏆 Campeonato VLS Guru — Inscrições Abertas!",
+            description=(
+                "Um novo torneio foi aberto!\n\n"
+                "📋 **Para participar:** Clique no botão abaixo.\n"
+                "⚠️ Você precisa ter **11 titulares escalados** no `/time`."
+            ),
+            color=discord.Color.gold()
+        )
+        guild = interaction.client.get_guild(self.guild_id)
+        channel = interaction.channel
+        view = ParticipateView(self.guild_id)
+        await channel.send(embed=embed, view=view)
+
+        await interaction.response.send_message(
+            "✅ **Campeonato criado!** A mensagem de inscrições foi enviada no canal.",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="🗡️ Iniciar Rodadas", style=discord.ButtonStyle.primary, row=0)
+    async def iniciar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+
+        doc_id = f"champ_{self.guild_id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhum campeonato criado.", ephemeral=True)
+
+        champ = record["data"]
+        if champ.get("status") != "waiting":
+            return await interaction.response.send_message("❌ O campeonato não está na fase de inscrições.", ephemeral=True)
+        if len(champ.get("participants", [])) < 2:
+            return await interaction.response.send_message("❌ São necessários pelo menos 2 participantes.", ephemeral=True)
+
+        import random as _rnd
+        participants = champ["participants"]
+        _rnd.shuffle(participants)
+
+        bye_player = None
+        if len(participants) % 2 != 0:
+            bye_player = participants.pop()
+
+        matches = [{"p1": participants[i], "p2": participants[i+1]} for i in range(0, len(participants), 2)]
+        champ["status"] = "active"
+        champ["round"] = 1
+        champ["matches"] = matches
+        champ["bye_player"] = bye_player
+        await db_upsert(doc_id, champ)
+
+        await interaction.response.send_message(
+            f"⚔️ **Campeonato iniciado!** Rodada 1 com {len(matches)} confrontos gerada.\n"
+            f"Use `/rodar_jogo` para simular os jogos desta rodada.",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="⏭️ Rodar Jogo", style=discord.ButtonStyle.secondary, row=0)
+    async def rodar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+        # Delega ao comando /rodar_jogo via simulação interna
+        await interaction.response.send_message(
+            "▶️ Para rodar os jogos desta rodada, use o comando `/rodar_jogo` no canal.",
+            ephemeral=True
+        )
+
+    @discord.ui.button(label="🗑️ Cancelar Campeonato", style=discord.ButtonStyle.danger, row=1)
+    async def cancelar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+
+        if not self.canceling:
+            self.canceling = True
+            button.label = "⚠️ Confirmar Cancelamento"
+            await interaction.response.edit_message(
+                content="⚠️ **Tem certeza?** Clique novamente para confirmar o cancelamento definitivo.",
+                view=self
+            )
+        else:
+            doc_id = f"champ_{self.guild_id}"
+            await db_delete(doc_id)
+            button.label = "🗑️ Cancelar Campeonato"
+            button.style = discord.ButtonStyle.danger
+            self.canceling = False
+            await interaction.response.edit_message(
+                content="🗑️ **Campeonato cancelado.** Todos os dados foram removidos.",
+                view=None
+            )
+
+
+# ══════════════════════════════════════════════════════════
+# Botão "Participar" na Mensagem do Campeonato
+# ══════════════════════════════════════════════════════════
+
+class ParticipateView(discord.ui.View):
+    def __init__(self, guild_id: int):
+        super().__init__(timeout=None)  # Persiste mesmo após reinício
+        self.guild_id = guild_id
+
+    @discord.ui.button(label="⚽ Participar do Torneio", style=discord.ButtonStyle.success, emoji="🏆", custom_id="participar_torneio")
+    async def participar_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        doc_id = f"champ_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhum campeonato ativo.", ephemeral=True)
+
+        champ = record["data"]
+        if champ.get("status") != "waiting":
+            return await interaction.response.send_message("❌ As inscrições estão encerradas.", ephemeral=True)
+
+        profile = await get_user_profile(interaction.user)
+        if len(profile.get("starting_xi", [])) < 11:
+            return await interaction.response.send_message(
+                "❌ Você precisa ter **11 titulares escalados** no `/time` para participar.", ephemeral=True
+            )
+
+        if interaction.user.id in champ["participants"]:
+            return await interaction.response.send_message("✅ Você já está inscrito!", ephemeral=True)
+
+        champ["participants"].append(interaction.user.id)
+        await db_upsert(doc_id, champ)
+        await interaction.response.send_message(
+            f"✅ **{interaction.user.display_name}** foi inscrito no torneio!\n"
+            f"Total de participantes: **{len(champ['participants'])}**",
+            ephemeral=True
+        )
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(MatchesCog(bot))
+

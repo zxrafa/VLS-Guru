@@ -1,0 +1,6 @@
+46: await interaction.response.send_modal(CriarJogadorModal2())
+67: await interaction.response.send_modal(CriarJogadorModal3())
+193: await interaction.response.send_modal(CriarJogadorModal1())
+243: class CriarJogadorModal1(VLSModal, title="Criar Jogador — Etapa 1/3: Dados Básicos"):
+289: class CriarJogadorModal2(VLSModal, title="Criar Jogador — Etapa 2/3: Atributos"):
+361: class CriarJogadorModal3(VLSModal, title="Criar Jogador — Etapa 3/3: Extras"):

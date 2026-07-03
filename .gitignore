@@ -1,0 +1,14 @@
+# Credenciais e configurações locais
+.env
+
+# Bancos de dados locais
+*.db
+
+# Caches e arquivos temporários
+cache_cartas/
+__pycache__/
+*.pyc
+.agents/
+.gemini/
+scratch/search_output.txt
+links_imagens.txt

@@ -1,0 +1,4 @@
+351: f"⭐ WF: {p.get('weak_foot', 1)} | ⭐ SM: {p.get('skill_moves', 1)} | PlayStyles: {ps_str}"
+357: f"⭐ WF: {p.get('weak_foot', 1)} | ⭐ SM: {p.get('skill_moves', 1)} | PlayStyles: {ps_str}"
+466: wf = player.get("weak_foot", 1)
+467: sm = player.get("skill_moves", 1)

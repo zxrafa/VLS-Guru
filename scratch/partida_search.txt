@@ -1,0 +1,12 @@
+config.py:126: {"id": "virada_historica", "category": "secretas", "name": "Milagre em Campo", "description": "Vença uma partida revertendo desvantagem de 3 ou mais gols", "threshold": 1, "reward_type": "coins", "reward_value": 200, "secret": True},
+simulation.py:316: Executa a simulação completa de uma partida de 90 minutos.
+cogs\dashboard.py:909: m_criterio   = discord.ui.TextInput(label="Critério: vitorias/gols/partidas/recrutamentos", placeholder="gols", max_length=15)
+cogs\dashboard.py:918: if criterio not in ["vitorias", "gols", "partidas", "recrutamentos"]:
+cogs\matches.py:39: Persiste o resultado da partida:
+cogs\matches.py:162: await econ_cog.increment_mission(p1_user.id, p1_profile, "partidas", 1)
+cogs\matches.py:167: await econ_cog.increment_mission(p2_user.id, p2_profile, "partidas", 1)
+cogs\matches.py:194: """Exibe a narração da partida ao vivo minuto a minuto e, no final, exibe o placar oficial com paginação."""
+cogs\matches.py:317: f"📢 **Fim de jogo!** O árbitro encerra a partida sob vaias e aplausos dos torcedores!"
+cogs\matches.py:380: return await interaction.response.send_message("❌ Bots não podem participar de partidas.", ephemeral=True)
+cogs\matches.py:397: @app_commands.command(name="x1_aposta", description="Desafia outro membro para uma partida com aposta em dinheiro.")
+cogs\matches.py:974: """View com paginação para navegar pelos lances da partida e acessar o placar final."""

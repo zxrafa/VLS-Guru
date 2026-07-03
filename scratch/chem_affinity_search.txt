@@ -1,0 +1,50 @@
+main.py:175: or request.url.scheme == "https"
+main.py:195: or request.url.scheme == "https"
+pitch_generator.py:150: chemistry_bonuses: dict = None
+pitch_generator.py:214: if chemistry_bonuses and player.get("instance_id") in chemistry_bonuses:
+pitch_generator.py:215: bonus = chemistry_bonuses[player["instance_id"]]
+simulation.py:180: def calculate_chemistry_bonus(starting_xi: list, formation: str) -> dict:
+simulation.py:216: def get_player_effective_stats(player: dict, chemistry_bonus: int, tactic: str, stamina: float = 100.0) -> dict:
+simulation.py:259: chem = max(0, chemistry_bonus)
+simulation.py:263: affinity_mult = 1.0 + min(0.05, (xp // 10) * 0.005)
+simulation.py:270: val = val + chem
+simulation.py:271: val = int(val * affinity_mult * stamina_mult)
+simulation.py:312: p1_chem: dict,
+simulation.py:313: p2_chem: dict,
+simulation.py:384: sum(get_player_effective_stats(p, p1_chem.get(p["instance_id"], 0), p1_tactic, p1_stamina[p["instance_id"]]).values())
+simulation.py:388: sum(get_player_effective_stats(p, p2_chem.get(p["instance_id"], 0), p2_tactic, p2_stamina[p["instance_id"]]).values())
+simulation.py:399: atk_chem    = p1_chem    if is_p1_attack else p2_chem
+simulation.py:400: def_chem    = p2_chem    if is_p1_attack else p1_chem
+simulation.py:420: atk_eff = get_player_effective_stats(atacante, atk_chem.get(atacante["instance_id"], 0), atk_tactic, atk_stamina[atacante["instance_id"]])
+simulation.py:421: def_eff = get_player_effective_stats(defensor, def_chem.get(defensor["instance_id"], 0), def_tactic, def_stamina[defensor["instance_id"]])
+simulation.py:422: gk_eff  = get_player_effective_stats(gk,       def_chem.get(gk["instance_id"], 0),       def_tactic, def_stamina[gk["instance_id"]])
+cogs\matches.py:18: from simulation import run_match_simulation, calculate_chemistry_bonus
+cogs\matches.py:520: p1_chem  = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
+cogs\matches.py:521: cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+cogs\matches.py:530: p1_chem   = p1_chem,
+cogs\matches.py:531: p2_chem   = cpu_chem,
+cogs\matches.py:815: p1_chem = calculate_chemistry_bonus(p1_prof["starting_xi"], p1_prof.get("formation", "4-3-3"))
+cogs\matches.py:816: p2_chem = calculate_chemistry_bonus(p2_prof["starting_xi"], p2_prof.get("formation", "4-3-3"))
+cogs\matches.py:825: p1_chem   = p1_chem,
+cogs\matches.py:826: p2_chem   = p2_chem,
+cogs\matches.py:936: p1_chem = calculate_chemistry_bonus(p1_xi, p1_profile.get("formation", "4-3-3"))
+cogs\matches.py:937: p2_chem = calculate_chemistry_bonus(p2_xi, p2_profile.get("formation", "4-3-3"))
+cogs\matches.py:946: p1_chem   = p1_chem,
+cogs\matches.py:947: p2_chem   = p2_chem,
+cogs\team.py:15: from simulation import calculate_chemistry_bonus
+cogs\team.py:78: chem_bonuses = calculate_chemistry_bonus(starting_xi, formation)
+cogs\team.py:96: chemistry_bonuses=chem_bonuses
+cogs\team.py:327: chem_bonuses = calculate_chemistry_bonus(starting_xi, formation)
+cogs\team.py:337: chem = chem_bonuses.get(p["instance_id"], 0)
+cogs\team.py:338: chem_indicator = f" (+{chem})" if chem > 0 else ""
+cogs\team.py:346: f"🧤 **{p.get('pos')}**: {p.get('col_emoji','✨')} **{p['name']}** `OVR {p['over']}{chem_indicator}`\n"
+cogs\team.py:353: f"⚽ **{p.get('pos')}**: {p.get('col_emoji','✨')} **{p['name']}** `OVR {p['over']}{chem_indicator}`\n"
+cogs\team.py:480: affinity_level = xp // 10
+cogs\team.py:481: affinity_bonus = min(5.0, affinity_level * 0.5)
+cogs\team.py:567: f"🤝 **Afinidade:** Nível **{affinity_level}** ({xp % 10}/10 XP)  •  **+{affinity_bonus:.1f}%** de bônus"
+cogs\team.py:669: chem_bonuses = calculate_chemistry_bonus(new_xi, formation)
+cogs\team.py:685: chemistry_bonuses=chem_bonuses
+cogs\team.py:1218: affinity_level = xp // 10
+cogs\team.py:1219: affinity_bonus = min(5.0, affinity_level * 0.5)
+cogs\team.py:1224: f"Nível de Afinidade: 📈 **{affinity_level}**\n"
+cogs\team.py:1226: f"Bônus de Atributo: ✨ **+{affinity_bonus:.1f}%**"

@@ -1,0 +1,2 @@
+.\cogs/dashboard.py:868: embed.add_field(name="📋 Listar Coleções", value="Exibe todas as coleções cadastradas.", inline=True)
+.\cogs/dashboard.py:910: await interaction.followup.send("**✨ Coleções cadastradas:**\n" + "\n".join(lines), ephemeral=True)

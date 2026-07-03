@@ -1,0 +1,36 @@
+112: embed.add_field(name="🛍️ Loja Custom", value="Criar e gerenciar produtos e pacotes personalizados.", inline=True)
+139: discord.SelectOption(label="🛍️ Loja",       value="loja",       description="Gerenciar produtos personalizados"),
+158: elif cat == "loja":
+159: embed, view = build_loja_panel(self.owner_id)
+1238: # LOJA PANEL (Produtos Personalizados)
+1241: def build_loja_panel(owner_id: int):
+1243: title="🛍️ Painel da Loja Customizada",
+1244: description="Crie e gerencie produtos personalizados que os usuários podem comprar na loja.",
+1247: embed.add_field(name="➕ Criar Produto", value="Adiciona um novo produto (pacote ou jogador direto) à loja.", inline=True)
+1248: embed.add_field(name="🗑️ Deletar Produto", value="Remove um produto da loja por ID.", inline=True)
+1249: embed.add_field(name="📋 Listar Produtos", value="Lista os produtos customizados ativos.", inline=True)
+1251: return embed, LojaPanelView(owner_id)
+1254: class LojaPanelView(discord.ui.View):
+1259: @discord.ui.button(label="➕ Criar Produto", style=discord.ButtonStyle.success, row=0)
+1260: async def criar_produto(self, interaction: discord.Interaction, button: discord.ui.Button):
+1263: await interaction.response.send_modal(CriarProdutoModal())
+1265: @discord.ui.button(label="🗑️ Deletar Produto", style=discord.ButtonStyle.danger, row=0)
+1266: async def deletar_produto(self, interaction: discord.Interaction, button: discord.ui.Button):
+1269: await interaction.response.send_modal(DeletarProdutoModal())
+1271: @discord.ui.button(label="📋 Listar Produtos", style=discord.ButtonStyle.secondary, row=0)
+1272: async def listar_produtos(self, interaction: discord.Interaction, button: discord.ui.Button):
+1277: products = await db_get_prefix("loja_produto_")
+1279: return await interaction.followup.send("⚠️ Nenhum produto personalizado cadastrado na loja.", ephemeral=True)
+1287: f"**Produto:** {p_data.get('emoji', '📦')} **{p_data['name']}**\n"
+1294: title="🛍️ Produtos Customizados da Loja",
+1301: class CriarProdutoModal(VLSModal, title="Criar Produto Personalizado"):
+1302: name        = discord.ui.TextInput(label="Nome do Produto", placeholder="Ex: Pacote Especial Copa", max_length=50)
+1303: emoji       = discord.ui.TextInput(label="Emoji do Produto", placeholder="Ex: 📦 ou 🏆", max_length=50, required=False)
+1354: await db_upsert(f"loja_produto_{prod_id}", prod_data)
+1356: f"✅ **Produto Criado!**\n"
+1365: class DeletarProdutoModal(VLSModal, title="Deletar Produto"):
+1366: prod_id = discord.ui.TextInput(label="ID do Produto (8 caracteres)", placeholder="Ex: a1b2c3d4", max_length=8)
+1370: record = await db_get(f"loja_produto_{p_id}")
+1372: return await interaction.response.send_message(f"❌ Produto `{p_id}` não encontrado.", ephemeral=True)
+1374: await db_delete(f"loja_produto_{p_id}")
+1375: await interaction.response.send_message(f"🗑️ Produto `{p_id}` removido da loja com sucesso.", ephemeral=True)

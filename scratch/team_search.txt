@@ -1,0 +1,6 @@
+350: f"**EST (DIV):** {p.get('div',75)} | **MAN (HAN):** {p.get('han',75)} | **CHU (KIC):** {p.get('kic',75)} | **REF (REF):** {p.get('ref',75)} | **VEL (SPD):** {p.get('spd',75)} | **POS (POS):** {p.get('pos_stat',75)}\n"
+356: f"**VEL (PAC):** {p.get('pac',75)} | **CHU (SHO):** {p.get('sho',75)} | **PAS (PAS):** {p.get('pas',75)} | **DRI (DRI):** {p.get('dri',75)} | **DEF (DEF):** {p.get('def',75)} | **FIS (PHY):** {p.get('phy',75)}\n"
+524: spd = player.get("spd", 75)
+532: f"🏃 **Velocidade (SPD):** `{spd}`  •  🛡️ **Posicionamento (POS):** `{pos_gk}`"
+537: pac = player.get("pac", 75)
+547: f"🏃 **Velocidade (PAC):** `{pac}`  •  🎯 **Passe (PAS):** `{pas}`\n"

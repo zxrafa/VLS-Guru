@@ -1,0 +1,39 @@
+./card_utils.py:10: import sqlite3
+./database.py:3: VLS Guru - Módulo de Banco de Dados (Suporte SQLite Local / Supabase)
+./database.py:8: import sqlite3
+./database.py:16: DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vls_guru_local.db")
+./database.py:30: print(f"[Database] Erro ao conectar ao Supabase: {e}. Usando SQLite local.")
+./database.py:34: conn = sqlite3.connect(DB_PATH, timeout=30.0)
+./database.py:315: print(f"Erro ao limpar o banco SQLite: {e}")
+./seed.py:7: import sqlite3
+.\cogs/admin.py:11: import sqlite3
+.\cogs/economy.py:1022: p_rec = await __import__('database').db_get(f"player_{m.get('reward_player_id','')}")
+.\scratch/check_custom_products.py:1: import sqlite3
+.\scratch/check_custom_products.py:4: DB_PATH = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/check_custom_products.py:7: conn = sqlite3.connect(DB_PATH)
+.\scratch/inspect_local_db.py:1: import sqlite3
+.\scratch/inspect_local_db.py:5: conn = sqlite3.connect('vls_guru_local.db')
+.\scratch/inspect_player_keys.py:1: import sqlite3
+.\scratch/inspect_player_keys.py:4: db_path = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/inspect_player_keys.py:5: conn = sqlite3.connect(db_path)
+.\scratch/list_all_players.py:1: import sqlite3
+.\scratch/list_all_players.py:5: db_path = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/list_all_players.py:6: conn = sqlite3.connect(db_path)
+.\scratch/list_world_cup_ids.py:1: import sqlite3
+.\scratch/list_world_cup_ids.py:4: DB_PATH = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/list_world_cup_ids.py:7: conn = sqlite3.connect(DB_PATH)
+.\scratch/migrate_and_shift_cards.py:5: import sqlite3
+.\scratch/migrate_and_shift_cards.py:17: DB_PATH = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/migrate_and_shift_cards.py:38: conn = sqlite3.connect(DB_PATH)
+.\scratch/migrate_and_shift_cards.py:59: conn = sqlite3.connect(DB_PATH)
+.\scratch/reset_database.py:1: import sqlite3
+.\scratch/reset_database.py:3: DB_PATH = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/reset_database.py:6: print("Conectando ao banco de dados SQLite...")
+.\scratch/reset_database.py:7: conn = sqlite3.connect(DB_PATH)
+.\scratch/seed_collections.py:2: import sqlite3
+.\scratch/seed_collections.py:13: conn = sqlite3.connect("vls_guru_local.db")
+.\scratch/update_player_cards.py:5: import sqlite3
+.\scratch/update_player_cards.py:16: DB_PATH = r"C:\Jogos\VLS Guru New\vls_guru_local.db"
+.\scratch/update_player_cards.py:130: conn = sqlite3.connect(DB_PATH)
+.\scratch/update_player_cards.py:154: print("\n💾 Aplicando alterações no banco de dados SQLite sequencialmente...")
+.\scratch/update_player_cards.py:155: conn = sqlite3.connect(DB_PATH)

@@ -1,0 +1,4 @@
+./main.py:46: ALLOWED_ADMIN_IDS: set[int] = {338704196180115458, 1411893056516391034, 792144300666126336}
+.\cogs/economy.py:180: embed.add_field(name="👑 Feito por", value="<@338704196180115458>", inline=False)
+.\cogs/matches.py:606: ALLOWED_IDS = {338704196180115458, 1411893056516391034, 792144300666126336}
+.\pasta_secreta/acesso.py:17: print("@vlsguruotavio")

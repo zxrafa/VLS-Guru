@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLS Guru — Dashboard Admin</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome para ícones premium -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- CSS Customizado -->
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Fundo dinâmico com gradiente animado -->
+    <div class="bg-blur"></div>
+    <div class="bg-blur2"></div>
+
+    <!-- Tela de Login -->
+    <div id="login-screen" class="login-container">
+        <div class="login-card">
+            <div class="logo-area">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                <h1>VLS GURU</h1>
+                <p>Painel Administrativo da Liga</p>
+            </div>
+            <p class="login-description">Faça login com sua conta do Discord para gerenciar jogadores, saldos dos managers e ver estatísticas da liga.</p>
+            <a href="/login" class="btn btn-discord">
+                <i class="fa-brands fa-discord"></i> Entrar com o Discord
+            </a>
+        </div>
+    </div>
+
+    <!-- Tela Principal do Dashboard -->
+    <div id="app-screen" class="app-layout" style="display: none;">
+        <!-- Sidebar lateral premium -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="fa-solid fa-shield-halved sidebar-logo"></i>
+                <div class="sidebar-title-area">
+                    <h2>VLS GURU</h2>
+                    <span>Admin Dashboard</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-menu">
+                <button class="menu-item active" data-tab="tab-overview">
+                    <i class="fa-solid fa-chart-simple"></i> Visão Geral
+                </button>
+                <button class="menu-item" data-tab="tab-players">
+                    <i class="fa-solid fa-users"></i> Gerenciar Jogadores
+                </button>
+                <button class="menu-item" data-tab="tab-members">
+                    <i class="fa-solid fa-address-card"></i> Membros & Managers
+                </button>
+                <button class="menu-item" data-tab="tab-collections">
+                    <i class="fa-solid fa-folder-open"></i> Coleções
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <img id="user-avatar" src="" alt="Avatar">
+                    <div class="user-info">
+                        <h4 id="user-name">Manager</h4>
+                        <span>Administrador</span>
+                    </div>
+                </div>
+                <button id="btn-logout" class="btn-logout" title="Sair">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Área Principal de Conteúdo -->
+        <main class="main-content">
+            <!-- Topbar com Título Dinâmico e Informações Rápidas -->
+            <header class="topbar">
+                <h1 id="tab-title">Visão Geral</h1>
+                <div class="server-status">
+                    <span class="status-indicator online"></span>
+                    <span>Bot VLS Guru Online</span>
+                </div>
+            </header>
+
+            <!-- CONTEÚDO: Visão Geral -->
+            <section id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon bg-blue"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Total de Jogadores</span>
+                            <h3 id="stat-total-players">-</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-purple"><i class="fa-solid fa-user-tie"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Managers Registrados</span>
+                            <h3 id="stat-total-users">-</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon bg-gold"><i class="fa-solid fa-coins"></i></div>
+                        <div class="stat-info">
+                            <span class="stat-label">Economia da Liga</span>
+                            <h3 id="stat-economy">-</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-row">
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>Ações Rápidas de Admin</h3>
+                        </div>
+                        <div class="panel-body quick-actions">
+                            <button class="action-btn" id="quick-add-player">
+                                <i class="fa-solid fa-user-plus"></i> Novo Jogador
+                            </button>
+                            <button class="action-btn" id="quick-create-col">
+                                <i class="fa-solid fa-folder-plus"></i> Nova Coleção
+                            </button>
+                            <a href="https://discord.com/channels/1393100041446756494" target="_blank" class="action-btn">
+                                <i class="fa-brands fa-discord"></i> Ir para o Servidor
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Gerenciar Jogadores -->
+            <section id="tab-players" class="tab-content">
+                <div class="filter-bar">
+                    <div class="search-input">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-player" placeholder="Pesquisar jogador pelo nome...">
+                    </div>
+                    <div class="select-wrapper">
+                        <select id="filter-position">
+                            <option value="">Todas Posições</option>
+                            <option value="GK">GK (Goleiro)</option>
+                            <option value="CB">CB (Zagueiro)</option>
+                            <option value="LB">LB (Lat. Esquerdo)</option>
+                            <option value="RB">RB (Lat. Direito)</option>
+                            <option value="LM">LM (Meia Esquerdo)</option>
+                            <option value="RM">RM (Meia Direito)</option>
+                            <option value="CDM">CDM (Volante)</option>
+                            <option value="CM">CM (Meio-Campista)</option>
+                            <option value="CAM">CAM (Meia Armador)</option>
+                            <option value="ST">ST (Centroavante)</option>
+                            <option value="LW">LW (Ponta Esquerda)</option>
+                            <option value="RW">RW (Ponta Direita)</option>
+                        </select>
+                    </div>
+                    <div class="select-wrapper">
+                        <select id="filter-collection">
+                            <option value="">Todas Coleções</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-add-player">
+                        <i class="fa-solid fa-plus"></i> Adicionar Jogador
+                    </button>
+                </div>
+
+                <div class="players-grid" id="players-list">
+                    <!-- Cards de jogadores injetados via JS -->
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Membros e Managers -->
+            <section id="tab-members" class="tab-content">
+                <div class="filter-bar">
+                    <div class="search-input">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="search-member" placeholder="Pesquisar membro pelo nome do Discord...">
+                    </div>
+                </div>
+
+                <div class="members-table-container glass">
+                    <table class="members-table">
+                        <thead>
+                            <tr>
+                                <th>Usuário Discord</th>
+                                <th>Nome do Clube</th>
+                                <th>Saldo (R$)</th>
+                                <th>Moedas Premium</th>
+                                <th>Elenco (Cards)</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="members-list">
+                            <!-- Injetado dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Coleções -->
+            <section id="tab-collections" class="tab-content">
+                <div class="filter-bar" style="justify-content: flex-end;">
+                    <button class="btn btn-primary" id="btn-add-collection">
+                        <i class="fa-solid fa-plus"></i> Nova Coleção
+                    </button>
+                </div>
+
+                <div class="collections-grid" id="collections-list">
+                    <!-- Injetado dinamicamente -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: Adicionar / Editar Jogador -->
+    <div id="modal-player" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3 id="modal-player-title">Adicionar Novo Jogador</h3>
+                <button class="modal-close" id="btn-close-player-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-player" class="modal-form">
+                <input type="hidden" id="player-id">
+                
+                <div class="form-group">
+                    <label for="player-name">Nome do Jogador</label>
+                    <input type="text" id="player-name" required placeholder="Ex: Cristiano Ronaldo">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="player-over">Overall (Rating)</label>
+                        <input type="number" id="player-over" required min="50" max="99" placeholder="Ex: 92">
+                    </div>
+                    <div class="form-group">
+                        <label for="player-pos">Posição Tática</label>
+                        <select id="player-pos" required>
+                            <option value="GK">GK (Goleiro)</option>
+                            <option value="CB">CB (Zagueiro)</option>
+                            <option value="LB">LB (Lat. Esquerdo)</option>
+                            <option value="RB">RB (Lat. Direito)</option>
+                            <option value="LWB">LWB (Ala Esquerdo)</option>
+                            <option value="RWB">RWB (Ala Direito)</option>
+                            <option value="CDM">CDM (Volante)</option>
+                            <option value="CM">CM (Meio-Campista)</option>
+                            <option value="CAM">CAM (Meia Armador)</option>
+                            <option value="LM">LM (Meia Esquerdo)</option>
+                            <option value="RM">RM (Meia Direito)</option>
+                            <option value="ST">ST (Centroavante)</option>
+                            <option value="LW">LW (Ponta Esquerda)</option>
+                            <option value="RW">RW (Ponta Direita)</option>
+                            <option value="CF">CF (Segundo Atacante)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="player-col">Coleção</label>
+                    <select id="player-col" required>
+                        <option value="">Carregando coleções...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Imagem do Card</label>
+                    <div class="image-upload-options">
+                        <label class="radio-label">
+                            <input type="radio" name="img-source" value="url" checked> Usar Link (URL)
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="img-source" value="upload"> Fazer Upload do PC
+                        </label>
+                    </div>
+                    <div id="group-url" class="img-input-group">
+                        <input type="url" id="player-img-url" placeholder="https://exemplo.com/carta.png">
+                    </div>
+                    <div id="group-upload" class="img-input-group" style="display: none;">
+                        <input type="file" id="player-img-file" accept="image/*">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-player">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Jogador</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Gerenciar Clube do Membro -->
+    <div id="modal-member" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3>Gerenciar Manager</h3>
+                <button class="modal-close" id="btn-close-member-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="member-profile-header">
+                <img id="member-modal-avatar" src="" alt="Avatar">
+                <div>
+                    <h2 id="member-modal-name">Nome do Discord</h2>
+                    <span id="member-modal-club">Nome do Clube</span>
+                </div>
+            </div>
+
+            <div class="tab-container">
+                <div class="tab-nav">
+                    <button class="tab-btn active" data-subtab="subtab-finance">Finanças</button>
+                    <button class="tab-btn" data-subtab="subtab-inventory">Dar Jogador</button>
+                </div>
+
+                <!-- SUBTELA: Ajustes de Dinheiro -->
+                <div id="subtab-finance" class="subtab-content active">
+                    <form id="form-member-finance" class="modal-form">
+                        <input type="hidden" id="member-modal-id">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="member-money">Saldo do Clube (R$)</label>
+                                <input type="number" id="member-money" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="member-premium">VLS Coins</label>
+                                <input type="number" id="member-premium" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">Salvar Finanças</button>
+                    </form>
+                </div>
+
+                <!-- SUBTELA: Dar Jogador -->
+                <div id="subtab-inventory" class="subtab-content">
+                    <div class="give-player-section">
+                        <div class="form-group">
+                            <label for="select-give-player">Selecionar Jogador da Base Global</label>
+                            <div class="search-select-group">
+                                <select id="select-give-player" class="full-select">
+                                    <option value="">Escolha um jogador...</option>
+                                </select>
+                                <button class="btn btn-success" id="btn-submit-give-player">
+                                    <i class="fa-solid fa-plus"></i> Dar Card
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="inventory-section">
+                            <h4>Elenco Atual do Manager (Clique para excluir)</h4>
+                            <div class="member-inventory-list" id="member-inventory-list">
+                                <!-- Jogadores do inventário dele -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Adicionar Coleção -->
+    <div id="modal-collection" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3>Adicionar Nova Coleção</h3>
+                <button class="modal-close" id="btn-close-col-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-collection" class="modal-form">
+                <div class="form-group">
+                    <label for="col-id">ID da Coleção (Minúsculo, sem espaços)</label>
+                    <input type="text" id="col-id" required placeholder="Ex: totw, lendaria" pattern="[a-z0-9_]+">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="col-name">Nome Exibido</label>
+                        <input type="text" id="col-name" required placeholder="Ex: Team of the Week">
+                    </div>
+                    <div class="form-group">
+                        <label for="col-emoji">Emoji da Coleção</label>
+                        <input type="text" id="col-emoji" required placeholder="Ex: 🌟, 👑">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-col">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Adicionar Coleção</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notificações Toast -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- JS principal -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+[
+  {
+    "line_number": 4,
+    "content": "Implementa simula\u00e7\u00e3o minuto a minuto com PlayStyles, qu\u00edmica, t\u00e1tica, estamina e narra\u00e7\u00e3o imersiva.",
+    "matched_playstyles": []
+  },
+  {
+    "line_number": 8,
+    "content": "from config import PLAYSTYLE_EMOJIS, TACTICS",
+    "matched_playstyles": []
+  },
+  {
+    "line_number": 454,
+    "content": "# PlayStyle \"ima_no_pe\": 95% de dom\u00ednio perfeito (evita erro de controle)",
+    "matched_playstyles": [
+      "ima_no_pe"
+    ]
+  },
+  {
+    "line_number": 455,
+    "content": "has_ima = \"ima_no_pe\" in atacante.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "ima_no_pe"
+    ]
+  },
+  {
+    "line_number": 459,
+    "content": "if random.random() < 0.15:  # 15% de chance de gerar narra\u00e7\u00e3o do PlayStyle",
+    "matched_playstyles": []
+  },
+  {
+    "line_number": 461,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['ima_no_pe']} **Im\u00e3 no P\u00e9!** \"",
+    "matched_playstyles": [
+      "ima_no_pe"
+    ]
+  },
+  {
+    "line_number": 474,
+    "content": "has_malvadeza = \"malvadeza\" in atacante.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "malvadeza"
+    ]
+  },
+  {
+    "line_number": 475,
+    "content": "has_rapid     = \"rapid\"     in atacante.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "rapid"
+    ]
+  },
+  {
+    "line_number": 477,
+    "content": "if has_malvadeza:",
+    "matched_playstyles": [
+      "malvadeza"
+    ]
+  },
+  {
+    "line_number": 479,
+    "content": "if has_rapid:",
+    "matched_playstyles": [
+      "rapid"
+    ]
+  },
+  {
+    "line_number": 486,
+    "content": "# PlayStyle \"perde_pressiona\" do defensor",
+    "matched_playstyles": [
+      "perde_pressiona"
+    ]
+  },
+  {
+    "line_number": 487,
+    "content": "has_perdepress = \"perde_pressiona\" in defensor.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "perde_pressiona"
+    ]
+  },
+  {
+    "line_number": 490,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['perde_pressiona']} **Perde-Pressiona!** \"",
+    "matched_playstyles": [
+      "perde_pressiona"
+    ]
+  },
+  {
+    "line_number": 497,
+    "content": "# Narra\u00e7\u00e3o opcional de drible bem-sucedido com PlayStyle",
+    "matched_playstyles": []
+  },
+  {
+    "line_number": 498,
+    "content": "if has_malvadeza and random.random() < 0.40:",
+    "matched_playstyles": [
+      "malvadeza"
+    ]
+  },
+  {
+    "line_number": 500,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['malvadeza']} **Malvadeza!** \"",
+    "matched_playstyles": [
+      "malvadeza"
+    ]
+  },
+  {
+    "line_number": 503,
+    "content": "elif has_rapid and random.random() < 0.35:",
+    "matched_playstyles": [
+      "rapid"
+    ]
+  },
+  {
+    "line_number": 505,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['rapid']} **Velocidade explosiva!** \"",
+    "matched_playstyles": [
+      "rapid"
+    ]
+  },
+  {
+    "line_number": 510,
+    "content": "# PlayStyle \"tecnica\": +3% assist\u00eancia; -10% erro de dom\u00ednio/passe",
+    "matched_playstyles": [
+      "tecnica"
+    ]
+  },
+  {
+    "line_number": 511,
+    "content": "# PlayStyle \"trivela\": +5% precis\u00e3o de passe",
+    "matched_playstyles": [
+      "trivela"
+    ]
+  },
+  {
+    "line_number": 512,
+    "content": "has_tecnica = passador and \"tecnica\" in passador.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "tecnica"
+    ]
+  },
+  {
+    "line_number": 513,
+    "content": "has_trivela = passador and \"trivela\" in passador.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "trivela"
+    ]
+  },
+  {
+    "line_number": 516,
+    "content": "if has_tecnica:",
+    "matched_playstyles": [
+      "tecnica"
+    ]
+  },
+  {
+    "line_number": 518,
+    "content": "if has_trivela:",
+    "matched_playstyles": [
+      "trivela"
+    ]
+  },
+  {
+    "line_number": 538,
+    "content": "# PlayStyle \"superchute\": +10% xG em chutes de fora da \u00e1rea",
+    "matched_playstyles": [
+      "superchute"
+    ]
+  },
+  {
+    "line_number": 539,
+    "content": "has_superchute = \"superchute\" in atacante.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "superchute"
+    ]
+  },
+  {
+    "line_number": 540,
+    "content": "if has_superchute:",
+    "matched_playstyles": [
+      "superchute"
+    ]
+  },
+  {
+    "line_number": 544,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['superchute']} **SuperChute!** \"",
+    "matched_playstyles": [
+      "superchute"
+    ]
+  },
+  {
+    "line_number": 548,
+    "content": "# PlayStyle \"acrobata\": +5% chance de voleio / +3% tesoura / +2% bicicleta",
+    "matched_playstyles": [
+      "acrobata"
+    ]
+  },
+  {
+    "line_number": 549,
+    "content": "has_acrobata = \"acrobata\" in atacante.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "acrobata"
+    ]
+  },
+  {
+    "line_number": 550,
+    "content": "if has_acrobata and random.random() < 0.10:",
+    "matched_playstyles": [
+      "acrobata"
+    ]
+  },
+  {
+    "line_number": 554,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['acrobata']} **Acrobata!** \"",
+    "matched_playstyles": [
+      "acrobata"
+    ]
+  },
+  {
+    "line_number": 558,
+    "content": "# PlayStyle \"anjo\": +25% chance de cabeceio defensivo bem-sucedido",
+    "matched_playstyles": [
+      "anjo"
+    ]
+  },
+  {
+    "line_number": 560,
+    "content": "has_anjo = \"anjo\" in defensor.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "anjo"
+    ]
+  },
+  {
+    "line_number": 561,
+    "content": "if has_anjo and random.random() < 0.25:",
+    "matched_playstyles": [
+      "anjo"
+    ]
+  },
+  {
+    "line_number": 564,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['anjo']} **Cabeceio defensivo!** \"",
+    "matched_playstyles": [
+      "anjo"
+    ]
+  },
+  {
+    "line_number": 593,
+    "content": "has_arremesso = \"arremesso_especial\" in gk.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "arremesso_especial"
+    ]
+  },
+  {
+    "line_number": 594,
+    "content": "# (este PlayStyle \u00e9 do goleiro; \u00e9 processado no evento de defesa abaixo)",
+    "matched_playstyles": []
+  },
+  {
+    "line_number": 598,
+    "content": "# Tentativa de GOL \u2014 verificar PlayStyle \"encaixada\" do goleiro",
+    "matched_playstyles": [
+      "encaixada"
+    ]
+  },
+  {
+    "line_number": 599,
+    "content": "has_encaixada = \"encaixada\" in gk.get(\"playstyles\", [])",
+    "matched_playstyles": [
+      "encaixada"
+    ]
+  },
+  {
+    "line_number": 600,
+    "content": "if has_encaixada and random.random() < 0.25:",
+    "matched_playstyles": [
+      "encaixada"
+    ]
+  },
+  {
+    "line_number": 607,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['encaixada']} **Encaixada!** \"",
+    "matched_playstyles": [
+      "encaixada"
+    ]
+  },
+  {
+    "line_number": 622,
+    "content": "# Assist\u00eancia \u2014 PlayStyle \"tecnica\" aumenta chances",
+    "matched_playstyles": [
+      "tecnica"
+    ]
+  },
+  {
+    "line_number": 623,
+    "content": "has_assist = random.random() < (0.75 if has_tecnica else 0.68)",
+    "matched_playstyles": [
+      "tecnica"
+    ]
+  },
+  {
+    "line_number": 651,
+    "content": "# PlayStyle \"arremesso_especial\": 15% de chance de o arremesso gerar assist\u00eancia futura",
+    "matched_playstyles": [
+      "arremesso_especial"
+    ]
+  },
+  {
+    "line_number": 654,
+    "content": "f\"\u23f1\ufe0f **{minute:02d}'** \u2014 {PLAYSTYLE_EMOJIS['arremesso_especial']} \"",
+    "matched_playstyles": [
+      "arremesso_especial"
+    ]
+  }
+]

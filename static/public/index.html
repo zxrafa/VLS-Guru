@@ -9,6 +9,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
+    <!-- FontAwesome para ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -33,9 +36,8 @@
         }
     </script>
 
-    <!-- Custom CSS styles for scrollbars and animations -->
+    <!-- Custom CSS styles for scrollbars and active transitions -->
     <style>
-        /* Custom scrollbar matching dark premium theme */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -56,36 +58,40 @@
         }
     </style>
 
-    <!-- React, ReactDOM, Babel Standalone and ESM imports -->
+    <!-- Import Map para garantir única instância de React compartilhada -->
+    <script type="importmap">
+      {
+        "imports": {
+          "react": "https://esm.sh/react@18.2.0",
+          "react-dom": "https://esm.sh/react-dom@18.2.0/client",
+          "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+          "framer-motion": "https://esm.sh/framer-motion@10.16.4?deps=react@18.2.0"
+        }
+      }
+    </script>
+    
+    <!-- Babel Standalone para transpilação JSX no navegador -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body class="text-white min-h-screen">
-    <div id="root"></div>
+    <div id="root">
+        <!-- Loader inicial sutil caso a rede demore para carregar os scripts -->
+        <div class="flex items-center justify-center min-h-screen bg-[#050508]">
+            <div class="flex flex-col items-center gap-4">
+                <i class="fa-solid fa-shield-halved text-4xl text-[#ff0055] animate-pulse"></i>
+                <span class="text-sm font-semibold tracking-wider text-slate-400">CARREGANDO PORTAL VLS...</span>
+            </div>
+        </div>
+    </div>
 
-    <!-- React Application Code with type="text/babel" and data-type="module" -->
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect } from 'https://esm.sh/react@18';
-        import ReactDOM from 'https://esm.sh/react-dom@18/client';
-        import { motion, AnimatePresence } from 'https://esm.sh/framer-motion@10';
-        import { 
-            Shield, 
-            Trophy, 
-            Calendar, 
-            Goal, 
-            Award, 
-            Newspaper, 
-            ArrowRight, 
-            Clock, 
-            CheckCircle2, 
-            XCircle, 
-            MinusCircle, 
-            Tv 
-        } from 'https://esm.sh/lucide-react';
+    <!-- Script React rodando sobre ESM compilado por Babel -->
+    <script type="text/babel" data-presets="react" data-type="module">
+        import React, { useState, useEffect } from 'react';
+        import ReactDOM from 'react-dom/client';
+        import { motion, AnimatePresence } from 'framer-motion';
 
-        // Animação de Luxo Ease
         const easeCurve = [0.16, 1, 0.3, 1];
 
-        // Variants de Animação Framer Motion
         const containerVariants = {
             hidden: { opacity: 0 },
             visible: {
@@ -107,9 +113,6 @@
             }
         };
 
-        // ==============================================================================
-        // WEB APP PRINCIPAL
-        // ==============================================================================
         function App() {
             const [activeTab, setActiveTab] = useState("championship");
             const [championships, setChampionships] = useState([]);
@@ -119,7 +122,7 @@
             const [leaguePlayers, setLeaguePlayers] = useState([]);
             const [countdown, setCountdown] = useState({ days: 2, hours: 14, minutes: 32, seconds: 45 });
 
-            // Timer para o countdown regressivo
+            // Timer para contagem regressiva
             useEffect(() => {
                 const interval = setInterval(() => {
                     setCountdown(prev => {
@@ -133,13 +136,12 @@
                 return () => clearInterval(interval);
             }, []);
 
-            // Carregamento inicial de campeonatos e notícias
+            // Busca de dados
             useEffect(() => {
                 fetchChampionships();
                 fetchNews();
             }, []);
 
-            // Busca de dados vinculados ao campeonato selecionado
             useEffect(() => {
                 if (selectedCampId) {
                     fetchMatches(selectedCampId);
@@ -202,7 +204,7 @@
                 }
             };
 
-            // Cálculo dinâmico da tabela de pontuação baseado nas partidas encerradas
+            // Processa classificação
             const calculateStandings = () => {
                 const table = {};
                 matches.forEach(m => {
@@ -254,14 +256,12 @@
             };
 
             const standings = calculateStandings();
-
-            // Próximo confronto em destaque
             const nextMatch = matches.find(m => !m.encerrada) || matches[0];
 
             return (
                 <div className="relative min-h-screen bg-dark-base text-white overflow-hidden pb-16 z-10">
                     
-                    {/* 1. AURORA BACKGROUND (Círculos Flutuantes) */}
+                    {/* Background Aurora Glow */}
                     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                         <motion.div 
                             animate={{
@@ -291,27 +291,24 @@
                         />
                     </div>
 
-                    {/* 2. HEADER FIXO (Glassmorphism) */}
+                    {/* Header */}
                     <header className="sticky top-0 z-50 w-full bg-dark-base/60 backdrop-blur-xl border-b border-white/[0.05]">
                         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
                             
-                            {/* Logo */}
                             <div className="flex items-center gap-2 cursor-pointer">
                                 <div className="p-2 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center">
-                                    <Shield className="w-5 h-5 text-neon-pink" />
+                                    <i className="fa-solid fa-shield-halved text-neon-pink text-lg"></i>
                                 </div>
                                 <span className="text-lg font-black tracking-wider bg-gradient-to-r from-neon-pink to-neon-cyan bg-clip-text text-transparent">
                                     LIGA VLS
                                 </span>
                             </div>
 
-                            {/* Navegação central com pílula de seleção animada */}
                             <nav className="relative flex items-center gap-1 bg-white/[0.03] border border-white/5 p-1 rounded-full backdrop-blur-md">
                                 {[
-                                    { id: "championship", label: "Campeonato", icon: Trophy },
-                                    { id: "news", label: "Notícias", icon: Newspaper }
+                                    { id: "championship", label: "Campeonato", icon: "fa-trophy" },
+                                    { id: "news", label: "Notícias", icon: "fa-newspaper" }
                                 ].map(tab => {
-                                    const Icon = tab.icon;
                                     const isActive = activeTab === tab.id;
                                     return (
                                         <button
@@ -328,17 +325,16 @@
                                                     transition={{ type: "spring", stiffness: 380, damping: 30 }}
                                                 />
                                             )}
-                                            <Icon className="w-4 h-4" />
+                                            <i className={`fa-solid ${tab.icon} text-xs`}></i>
                                             {tab.label}
                                         </button>
                                     );
                                 })}
                             </nav>
 
-                            {/* Área do Time */}
                             <a href="/paineladm" className="relative overflow-hidden group bg-gradient-to-r from-neon-pink to-[#db2777] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full shadow-[0_0_20px_rgba(255,0,85,0.25)] hover:shadow-[0_0_35px_rgba(6,182,212,0.35)] transition-all duration-300 border border-white/10">
                                 <span className="relative z-10 flex items-center gap-2">
-                                    Painel Admin <ArrowRight className="w-3.5 h-3.5" />
+                                    Painel Admin <i className="fa-solid fa-arrow-right text-xs"></i>
                                 </span>
                                 <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-white/0 via-white/20 to-white/0 transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
                             </a>
@@ -346,7 +342,7 @@
                         </div>
                     </header>
 
-                    {/* 3. CONTEÚDO */}
+                    {/* Main content */}
                     <main className="max-w-7xl mx-auto px-6 mt-8 relative z-10">
                         <AnimatePresence mode="wait">
                             
@@ -359,10 +355,10 @@
                                     exit="hidden"
                                     className="grid grid-cols-1 lg:grid-cols-3 gap-6"
                                 >
-                                    {/* Selector de Campeonato Integrado */}
+                                    {/* Selector */}
                                     <motion.div variants={itemVariants} className="lg:col-span-3 flex justify-between items-center bg-white/[0.02] border border-white/5 p-4 rounded-2xl backdrop-blur-md">
                                         <div className="flex items-center gap-2">
-                                            <Trophy className="w-5 h-5 text-neon-pink" />
+                                            <i className="fa-solid fa-trophy text-neon-pink text-base"></i>
                                             <span className="font-extrabold text-sm uppercase tracking-wider text-slate-300">Escolha o Campeonato Ativo:</span>
                                         </div>
                                         <select 
@@ -377,7 +373,7 @@
                                         </select>
                                     </motion.div>
 
-                                    {/* CARD PRÓXIMO CONFRONTO */}
+                                    {/* PRÓXIMO CONFRONTO */}
                                     {nextMatch ? (
                                         <motion.div 
                                             variants={itemVariants} 
@@ -388,7 +384,7 @@
                                             <div className="flex-1 flex items-center justify-around w-full">
                                                 <div className="flex flex-col items-center gap-3 text-center">
                                                     <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                                                        <Shield className="w-8 h-8 text-neon-pink" />
+                                                        <i className="fa-solid fa-shield-halved text-neon-pink text-2xl"></i>
                                                     </div>
                                                     <div>
                                                         <h4 className="font-extrabold text-base text-white">{nextMatch.time_casa}</h4>
@@ -413,7 +409,7 @@
 
                                                 <div className="flex flex-col items-center gap-3 text-center">
                                                     <div className="w-16 h-16 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
-                                                        <Shield className="w-8 h-8 text-neon-cyan" />
+                                                        <i className="fa-solid fa-shield-halved text-neon-cyan text-2xl"></i>
                                                     </div>
                                                     <div>
                                                         <h4 className="font-extrabold text-base text-white">{nextMatch.time_fora}</h4>
@@ -426,7 +422,7 @@
 
                                             <div className="w-full md:w-80 flex flex-col gap-3 text-center md:text-left">
                                                 <div className="flex items-center justify-center md:justify-start gap-2 text-neon-pink">
-                                                    <Clock className="w-4 h-4 animate-pulse" />
+                                                    <i className="fa-solid fa-clock text-neon-pink animate-pulse text-sm"></i>
                                                     <span className="text-[10px] font-extrabold uppercase tracking-widest text-neon-pink">JOGO EM FOCO</span>
                                                 </div>
                                                 <h3 className="text-xl font-black text-white">
@@ -434,7 +430,7 @@
                                                 </h3>
                                                 {nextMatch.video_url && (
                                                     <a href={nextMatch.video_url} target="_blank" className="flex items-center justify-center md:justify-start gap-2 text-xs font-bold text-neon-cyan hover:underline">
-                                                        <Tv className="w-4 h-4 text-red-500" /> Assistir Gravação da Partida
+                                                        <i className="fa-solid fa-tv text-red-500 text-sm"></i> Assistir Transmissão
                                                     </a>
                                                 )}
 
@@ -454,17 +450,17 @@
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="lg:col-span-3 text-center p-8 bg-white/[0.02] border border-white/5 rounded-3xl text-slate-400">Nenhum confronto cadastrado ainda para este campeonato.</div>
+                                        <div className="lg:col-span-3 text-center p-8 bg-white/[0.02] border border-white/5 rounded-3xl text-slate-400 text-sm">Nenhum confronto cadastrado ainda para este campeonato.</div>
                                     )}
 
-                                    {/* CLASSIFICAÇÃO DA LIGA */}
+                                    {/* CLASSIFICAÇÃO */}
                                     <motion.div 
                                         variants={itemVariants}
                                         className="lg:col-span-2 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                                     >
                                         <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
                                             <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                <Trophy className="w-4 h-4 text-neon-pink" /> TABELA DE CLASSIFICAÇÃO
+                                                <i className="fa-solid fa-trophy text-neon-pink text-base"></i> TABELA DE CLASSIFICAÇÃO
                                             </h3>
                                         </div>
 
@@ -505,9 +501,9 @@
                                                                         <div className="flex justify-end gap-1">
                                                                             {t.form.slice(-5).map((res, fIdx) => (
                                                                                 <span key={fIdx}>
-                                                                                    {res === "W" && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                                                                                    {res === "L" && <XCircle className="w-3.5 h-3.5 text-rose-500" />}
-                                                                                    {res === "D" && <MinusCircle className="w-3.5 h-3.5 text-amber-500" />}
+                                                                                    {res === "W" && <i className="fa-solid fa-circle-check text-emerald-500 text-sm"></i>}
+                                                                                    {res === "L" && <i className="fa-solid fa-circle-xmark text-rose-500 text-sm"></i>}
+                                                                                    {res === "D" && <i className="fa-solid fa-circle-minus text-amber-500 text-sm"></i>}
                                                                                 </span>
                                                                             ))}
                                                                         </div>
@@ -523,7 +519,7 @@
                                         </div>
                                     </motion.div>
 
-                                    {/* ARTILHARIA E ESTATÍSTICAS */}
+                                    {/* ARTILHARIA & NOTAS */}
                                     <div className="flex flex-col gap-6">
                                         <motion.div 
                                             variants={itemVariants}
@@ -531,7 +527,7 @@
                                         >
                                             <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
                                                 <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                    <Goal className="w-4 h-4 text-neon-cyan" /> ARTILHARIA & NOTAS
+                                                    <i className="fa-solid fa-soccer-ball text-neon-cyan text-base"></i> ARTILHARIA & NOTAS
                                                 </h3>
                                             </div>
 
@@ -564,14 +560,14 @@
                                         </motion.div>
                                     </div>
 
-                                    {/* AGENDA DA RODADA */}
+                                    {/* CALENDÁRIO */}
                                     <motion.div 
                                         variants={itemVariants}
                                         className="lg:col-span-3 bg-white/[0.02] border border-white/5 rounded-3xl p-6 backdrop-blur-xl"
                                     >
                                         <div className="flex justify-between items-center border-b border-white/5 pb-4 mb-4">
                                             <h3 className="text-sm font-extrabold flex items-center gap-2 text-white">
-                                                <Calendar className="w-4 h-4 text-neon-pink" /> CALENDÁRIO DA LIGA
+                                                <i className="fa-solid fa-calendar-days text-neon-pink text-base"></i> CALENDÁRIO DA LIGA
                                             </h3>
                                         </div>
 
@@ -631,7 +627,7 @@
 
                                                 <div className="p-6 flex flex-col gap-3 flex-1">
                                                     <span className="text-[9px] font-semibold text-slate-500 flex items-center gap-1">
-                                                        <Clock className="w-3 h-3" /> {new Date(article.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
+                                                        <i className="fa-solid fa-clock text-slate-500 text-xs"></i> {new Date(article.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' })}
                                                     </span>
                                                     <h3 className="text-base font-extrabold text-white leading-snug group-hover:text-neon-cyan transition-colors duration-300">
                                                         {article.titulo}
@@ -651,7 +647,7 @@
                         </AnimatePresence>
                     </main>
 
-                    {/* 4. FOOTER */}
+                    {/* Footer */}
                     <footer className="max-w-7xl mx-auto px-6 mt-16 pt-8 border-t border-white/[0.05] flex flex-col md:flex-row justify-between items-center gap-6 relative z-10">
                         <div className="flex flex-col items-center md:items-start gap-1">
                             <span className="text-xs font-bold text-white">LIGA DE FUTEBOL VLS</span>
@@ -674,7 +670,6 @@
             );
         }
 
-        // Render application
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>

@@ -10,5 +10,22 @@ __pycache__/
 *.pyc
 .agents/
 .gemini/
-scratch/search_output.txt
+
+# Arquivos de log e relatórios locais
 links_imagens.txt
+search_output.txt
+*.png.log
+
+# Imagens de teste temporárias
+c7759198b11c276770c85e52db34a0ed.png
+
+# Scripts de teste e desenvolvimento
+scratch/
+fabrica_cartas.py
+seed.py
+schema_supabase.sql
+SPECIFICATION.md
+
+# Coleções de assets locais não utilizadas pelo bot principal
+Colecao_Cartas/
+Colecao_Emojis/

@@ -1,5 +1,0 @@
-17: def format_stars(active_count: int) -> str:
-565: f"Perna Ruim: <:perna:1520392085360873482> {format_stars(wf)}\n"
-566: f"Fintas:         <:Fintas:1520392750548123701> {format_stars(sm)}\n"
-1153: f"🦶 Perna Ruim: <:perna:1520392085360873482> {format_stars(wf)}\n"
-1154: f"💫 Fintas:     <:Fintas:1520392750548123701> {format_stars(sm)}"

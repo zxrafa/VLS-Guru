@@ -1,6 +1,0 @@
-./database.py:4: Substitui o Supabase por um banco de dados local para testes e execução autônoma,
-./requirements.txt:3: supabase>=2.0.0
-./SPECIFICATION.md:14: - Bot novo, banco de dados separado do atual (Supabase em projeto/tabela própria).
-./SPECIFICATION.md:15: - Reaproveitamento de **código-base** (estrutura de comandos, conexão com Supabase, servidor web) é aceitável; reaproveitamento de **cartas, jogadores e dados de usuários** não é.
-./SPECIFICATION.md:293: - Tabela de missões no Supabase, com tipo (`semanal`/`mensal`), critério (`vitorias`, `gols`, `partidas`, `recrutamentos`) e recompensa (dinheiro, moedas premium ou um jogador específico).
-.\__pycache__/database.cpython-312.pyc:12: Substitui o Supabase por um banco de dados local para testes e execução autônoma,

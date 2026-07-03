@@ -11,7 +11,7 @@
     <!-- FontAwesome para ícones premium -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- CSS Customizado -->
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/admin/style.css">
 </head>
 <body>
     <!-- Fundo dinâmico com gradiente animado -->
@@ -57,6 +57,15 @@
                 </button>
                 <button class="menu-item" data-tab="tab-collections">
                     <i class="fa-solid fa-folder-open"></i> Coleções
+                </button>
+                <button class="menu-item" data-tab="tab-championships">
+                    <i class="fa-solid fa-trophy"></i> Campeonatos
+                </button>
+                <button class="menu-item" data-tab="tab-matches">
+                    <i class="fa-solid fa-calendar-days"></i> Jogos & Partidas
+                </button>
+                <button class="menu-item" data-tab="tab-news">
+                    <i class="fa-solid fa-newspaper"></i> Notícias
                 </button>
             </nav>
 
@@ -207,6 +216,63 @@
                 </div>
 
                 <div class="collections-grid" id="collections-list">
+                    <!-- Injetado dinamicamente -->
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Campeonatos -->
+            <section id="tab-championships" class="tab-content">
+                <div class="filter-bar" style="justify-content: flex-end;">
+                    <button class="btn btn-primary" id="btn-add-championship">
+                        <i class="fa-solid fa-plus"></i> Novo Campeonato
+                    </button>
+                </div>
+                <div class="collections-grid" id="championships-list">
+                    <!-- Injetado dinamicamente -->
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Jogos & Partidas -->
+            <section id="tab-matches" class="tab-content">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <i class="fa-solid fa-filter"></i>
+                        <select id="filter-match-championship" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; font-family: inherit; font-size: 0.9rem; outline: none; margin-left: 0.5rem;">
+                            <option value="">Filtrar por Campeonato (Todos)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-add-match">
+                        <i class="fa-solid fa-plus"></i> Novo Jogo
+                    </button>
+                </div>
+                
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Campeonato</th>
+                                <th>Rodada</th>
+                                <th>Confronto</th>
+                                <th>Placar</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="matches-list">
+                            <!-- Injetado dinamicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- CONTEÚDO: Notícias -->
+            <section id="tab-news" class="tab-content">
+                <div class="filter-bar" style="justify-content: flex-end;">
+                    <button class="btn btn-primary" id="btn-add-news">
+                        <i class="fa-solid fa-plus"></i> Nova Notícia
+                    </button>
+                </div>
+                <div class="collections-grid" id="news-list" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">
                     <!-- Injetado dinamicamente -->
                 </div>
             </section>
@@ -384,10 +450,161 @@
         </div>
     </div>
 
+    <!-- MODAL: Adicionar / Editar Campeonato -->
+    <div id="modal-championship" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3 id="modal-championship-title">Novo Campeonato</h3>
+                <button class="modal-close" id="btn-close-championship-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-championship" class="modal-form" enctype="multipart/form-data">
+                <input type="hidden" id="championship-id">
+                
+                <div class="form-group">
+                    <label for="championship-name">Nome do Campeonato</label>
+                    <input type="text" id="championship-name" required placeholder="Ex: Copa VLS 2026">
+                </div>
+
+                <div class="form-group">
+                    <label for="championship-logo-url">URL da Logo (Opcional)</label>
+                    <input type="text" id="championship-logo-url" placeholder="http://...">
+                </div>
+
+                <div class="form-group">
+                    <label for="championship-logo-file">Ou Enviar Imagem do PC</label>
+                    <input type="file" id="championship-logo-file" accept="image/*">
+                </div>
+
+                <div class="form-group form-row">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
+                        <input type="checkbox" id="championship-active" checked> Campeonato Ativo
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-championship">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Campeonato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Adicionar / Editar Jogo -->
+    <div id="modal-match" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3 id="modal-match-title">Novo Jogo</h3>
+                <button class="modal-close" id="btn-close-match-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-match" class="modal-form">
+                <input type="hidden" id="match-id">
+                
+                <div class="form-group">
+                    <label for="match-championship">Campeonato</label>
+                    <select id="match-championship" required style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; width: 100%; font-family: inherit; outline: none;">
+                        <option value="">Selecione um campeonato...</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="match-round">Fase / Rodada</label>
+                        <input type="text" id="match-round" required placeholder="Ex: Rodada 1 ou Semifinal">
+                    </div>
+                    <div class="form-group">
+                        <label for="match-date">Data do Jogo (Opcional)</label>
+                        <input type="datetime-local" id="match-date" style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; width: 100%; font-family: inherit; outline: none;">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="match-home">Time de Casa</label>
+                        <input type="text" id="match-home" required placeholder="Ex: VLS FC">
+                    </div>
+                    <div class="form-group">
+                        <label for="match-away">Time de Fora</label>
+                        <input type="text" id="match-away" required placeholder="Ex: Real Madrid">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="match-gols-home">Gols Casa (Opcional)</label>
+                        <input type="number" id="match-gols-home" min="0" placeholder="Ex: 2">
+                    </div>
+                    <div class="form-group">
+                        <label for="match-gols-away">Gols Fora (Opcional)</label>
+                        <input type="number" id="match-gols-away" min="0" placeholder="Ex: 1">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="match-video">Link da Gravação (Opcional)</label>
+                    <input type="url" id="match-video" placeholder="Ex: https://youtube.com/watch?...">
+                </div>
+
+                <div class="form-group form-row">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
+                        <input type="checkbox" id="match-ended"> Partida Encerrada
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-match">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Jogo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Adicionar / Editar Notícia -->
+    <div id="modal-news" class="modal">
+        <div class="modal-content glass animate-slide-down">
+            <div class="modal-header">
+                <h3 id="modal-news-title">Nova Notícia</h3>
+                <button class="modal-close" id="btn-close-news-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form id="form-news" class="modal-form" enctype="multipart/form-data">
+                <input type="hidden" id="news-id">
+                
+                <div class="form-group">
+                    <label for="news-title">Título da Notícia</label>
+                    <input type="text" id="news-title" required placeholder="Ex: Grande Final Confirmada!">
+                </div>
+
+                <div class="form-group">
+                    <label for="news-subtitle">Subtítulo</label>
+                    <input type="text" id="news-subtitle" placeholder="Ex: VLS enfrenta Real na disputa pela taça">
+                </div>
+
+                <div class="form-group">
+                    <label for="news-image-url">URL da Imagem de Capa (Opcional)</label>
+                    <input type="text" id="news-image-url" placeholder="http://...">
+                </div>
+
+                <div class="form-group">
+                    <label for="news-image-file">Ou Enviar Imagem do PC</label>
+                    <input type="file" id="news-image-file" accept="image/*">
+                </div>
+
+                <div class="form-group">
+                    <label for="news-content">Conteúdo da Matéria</label>
+                    <textarea id="news-content" required placeholder="Escreva a notícia aqui..." rows="6" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border-card); color:var(--text-primary); border-radius:8px; padding:0.75rem; font-family:inherit; outline:none; resize:vertical;"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-news">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Publicar Notícia</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Notificações Toast -->
     <div id="toast-container" class="toast-container"></div>
 
     <!-- JS principal -->
-    <script src="/static/app.js"></script>
+    <script src="/static/admin/app.js"></script>
 </body>
 </html>

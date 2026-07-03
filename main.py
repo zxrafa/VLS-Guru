@@ -91,10 +91,20 @@ bot = commands.Bot(command_prefix="vls!", intents=intents, help_command=None)
 # ==============================================================================
 
 async def handle_index(request: web.Request) -> web.Response:
-    index_path = os.path.join(BASE_DIR, "static", "index.html")
-    if not os.path.exists(index_path):
-        return web.Response(text="Dashboard: arquivo static/index.html não encontrado.", status=404)
-    return web.FileResponse(index_path)
+    public_index = os.path.join(BASE_DIR, "static", "public", "index.html")
+    if os.path.exists(public_index):
+        return web.FileResponse(public_index)
+    return web.Response(
+        text="<h1>Portal da Liga VLS</h1><p>Conexao estabelecida com sucesso.</p>",
+        content_type="text/html"
+    )
+
+
+async def handle_paineladm(request: web.Request) -> web.Response:
+    admin_index = os.path.join(BASE_DIR, "static", "admin", "index.html")
+    if not os.path.exists(admin_index):
+        return web.Response(text="Erro: static/admin/index.html não encontrado.", status=404)
+    return web.FileResponse(admin_index)
 
 
 async def handle_login(request: web.Request) -> web.HTTPFound:
@@ -174,7 +184,7 @@ async def handle_callback(request: web.Request) -> web.Response:
         request.headers.get("X-Forwarded-Proto", "http") == "https"
         or request.url.scheme == "https"
     )
-    response = web.HTTPFound("/")
+    response = web.HTTPFound("/paineladm")
     response.set_cookie("session_id", session_token, max_age=60 * 60 * 24 * 7, httponly=True, secure=is_secure, samesite="Lax")
     return response
 
@@ -419,6 +429,32 @@ async def api_post_member_remove_player(request: web.Request) -> web.Response:
 # HELPER DE UPLOAD DE IMAGEM (ImgBB)
 # ==============================================================================
 
+async def _process_general_image_upload(data, url_key: str, file_key: str) -> str:
+    """
+    Processa um campo de URL ou um arquivo enviado em um form multipart.
+    Envia o arquivo para o ImgBB se fornecido, ou retorna a URL direta.
+    """
+    img_url = data.get(url_key)
+    img_file = data.get(file_key)
+
+    if img_url and isinstance(img_url, str) and img_url.strip():
+        return img_url.strip()
+
+    if img_file and isinstance(img_file, web.FileField):
+        file_bytes = img_file.file.read()
+
+        def _upload() -> str:
+            resp = requests.post(
+                f"https://api.imgbb.com/1/upload?key={IMGBB_API_KEY}",
+                files={"image": ("image.png", file_bytes)}
+            )
+            if resp.status_code == 200:
+                return resp.json()["data"]["url"]
+            print(f"Erro no ImgBB upload: {resp.text}")
+            return ""
+        return await asyncio.to_thread(_upload)
+    return ""
+
 async def _process_card_upload(data, fallback: str = "") -> str:
     """
     Processa o campo 'card_url' ou 'card_file' de um form multipart.
@@ -455,6 +491,157 @@ async def _process_card_upload(data, fallback: str = "") -> str:
 
 
 # ==============================================================================
+# ENDPOINTS DE CAMPEONATOS, PARTIDAS E NOTÍCIAS (LIGA VLS)
+# ==============================================================================
+
+async def api_get_public_campeonatos(request: web.Request) -> web.Response:
+    from database import get_all_campeonatos
+    cols = await get_all_campeonatos()
+    return web.json_response(cols)
+
+
+@login_required
+async def api_post_campeonato(request: web.Request) -> web.Response:
+    from database import save_campeonato
+    data = await request.post()
+    
+    nome = data.get("nome", "").strip()
+    c_id = data.get("id", "").strip()
+    ativo = data.get("ativo") == "true" or data.get("ativo") == "1" or data.get("ativo") is None
+
+    if not nome:
+        return web.Response(text="Nome do campeonato é obrigatório.", status=400)
+
+    if not c_id:
+        import uuid
+        c_id = str(uuid.uuid4())
+
+    logo_url = await _process_general_image_upload(data, "logo_url", "logo_file")
+    
+    success = await save_campeonato(c_id, nome, logo_url if logo_url else None, ativo)
+    if success:
+        return web.json_response({"success": True, "id": c_id})
+    return web.Response(text="Erro ao salvar campeonato no banco.", status=500)
+
+
+@login_required
+async def api_delete_campeonato_endpoint(request: web.Request) -> web.Response:
+    from database import delete_campeonato
+    c_id = request.match_info.get("id")
+    success = await delete_campeonato(c_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao deletar campeonato.", status=500)
+
+
+async def api_get_public_partidas(request: web.Request) -> web.Response:
+    from database import get_all_partidas
+    c_id = request.query.get("campeonato_id")
+    partidas = await get_all_partidas(c_id)
+    return web.json_response(partidas)
+
+
+@login_required
+async def api_post_partida(request: web.Request) -> web.Response:
+    from database import save_partida
+    body = await request.json()
+    
+    p_id = body.get("id", "").strip()
+    c_id = body.get("campeonato_id", "").strip()
+    rodada = body.get("rodada", "").strip()
+    time_casa = body.get("time_casa", "").strip()
+    time_fora = body.get("time_fora", "").strip()
+    
+    if not c_id or not rodada or not time_casa or not time_fora:
+        return web.Response(text="Campos obrigatórios ausentes para a partida.", status=400)
+
+    if not p_id:
+        import uuid
+        p_id = str(uuid.uuid4())
+
+    gols_casa = body.get("gols_casa")
+    gols_fora = body.get("gols_fora")
+    if gols_casa is not None and str(gols_casa).strip() != "":
+        gols_casa = int(gols_casa)
+    else:
+        gols_casa = None
+
+    if gols_fora is not None and str(gols_fora).strip() != "":
+        gols_fora = int(gols_fora)
+    else:
+        gols_fora = None
+
+    partida_data = {
+        "id": p_id,
+        "campeonato_id": c_id,
+        "rodada": rodada,
+        "time_casa": time_casa,
+        "time_fora": time_fora,
+        "gols_casa": gols_casa,
+        "gols_fora": gols_fora,
+        "encerrada": bool(body.get("encerrada")),
+        "video_url": body.get("video_url") if body.get("video_url") else None,
+        "data_jogo": body.get("data_jogo") if body.get("data_jogo") else None
+    }
+
+    success = await save_partida(partida_data)
+    if success:
+        return web.json_response({"success": True, "id": p_id})
+    return web.Response(text="Erro ao salvar partida.", status=500)
+
+
+@login_required
+async def api_delete_partida_endpoint(request: web.Request) -> web.Response:
+    from database import delete_partida
+    p_id = request.match_info.get("id")
+    success = await delete_partida(p_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao deletar partida.", status=500)
+
+
+async def api_get_public_noticias(request: web.Request) -> web.Response:
+    from database import get_all_noticias
+    noticias = await get_all_noticias()
+    return web.json_response(noticias)
+
+
+@login_required
+async def api_post_noticia(request: web.Request) -> web.Response:
+    from database import save_noticia
+    data = await request.post()
+    
+    n_id = data.get("id", "").strip()
+    titulo = data.get("titulo", "").strip()
+    subtitulo = data.get("subtitulo", "").strip()
+    conteudo = data.get("conteudo", "").strip()
+
+    if not titulo or not conteudo:
+        return web.Response(text="Título e Conteúdo são obrigatórios para a notícia.", status=400)
+
+    if not n_id:
+        import uuid
+        n_id = str(uuid.uuid4())
+
+    imagem_url = await _process_general_image_upload(data, "imagem_url", "imagem_file")
+    
+    success = await save_noticia(n_id, titulo, subtitulo if subtitulo else None, conteudo, imagem_url if imagem_url else None)
+    if success:
+        return web.json_response({"success": True, "id": n_id})
+    return web.Response(text="Erro ao salvar notícia no banco.", status=500)
+
+
+@login_required
+async def api_delete_noticia_endpoint(request: web.Request) -> web.Response:
+    from database import delete_noticia
+    n_id = request.match_info.get("id")
+    success = await delete_noticia(n_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao deletar notícia.", status=500)
+
+
+# ==============================================================================
 # CONFIGURAÇÃO E INÍCIO DO SERVIDOR WEB
 # ==============================================================================
 
@@ -462,6 +649,7 @@ async def start_web_server():
     app = web.Application(client_max_size=1024 ** 2 * 50)
 
     app.router.add_get("/", handle_index)
+    app.router.add_get("/paineladm", handle_paineladm)
     static_path = os.path.join(BASE_DIR, "static")
     app.router.add_static("/static/", path=static_path, name="static")
 
@@ -473,6 +661,21 @@ async def start_web_server():
 
     # Stats
     app.router.add_get("/api/stats", api_stats)
+
+    # Campeonatos
+    app.router.add_get("/api/public/campeonatos",         api_get_public_campeonatos)
+    app.router.add_post("/api/campeonatos",               api_post_campeonato)
+    app.router.add_delete("/api/campeonatos/{id}",        api_delete_campeonato_endpoint)
+
+    # Partidas
+    app.router.add_get("/api/public/partidas",             api_get_public_partidas)
+    app.router.add_post("/api/partidas",                   api_post_partida)
+    app.router.add_delete("/api/partidas/{id}",            api_delete_partida_endpoint)
+
+    # Notícias
+    app.router.add_get("/api/public/noticias",             api_get_public_noticias)
+    app.router.add_post("/api/noticias",                   api_post_noticia)
+    app.router.add_delete("/api/noticias/{id}",            api_delete_noticia_endpoint)
 
     # Coleções
     app.router.add_get("/api/colecoes",          api_get_colecoes)

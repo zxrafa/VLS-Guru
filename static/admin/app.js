@@ -123,7 +123,10 @@ function switchTab(tabId) {
         "tab-overview": "Visão Geral",
         "tab-players": "Gerenciar Jogadores",
         "tab-members": "Membros & Managers",
-        "tab-collections": "Coleções Cadastradas"
+        "tab-collections": "Coleções Cadastradas",
+        "tab-championships": "Gerenciar Campeonatos",
+        "tab-matches": "Confrontos & Resultados",
+        "tab-news": "Notícias da Liga"
     };
     document.getElementById("tab-title").textContent = titles[tabId] || "Dashboard";
 
@@ -131,6 +134,12 @@ function switchTab(tabId) {
     if (tabId === "tab-players") loadPlayers();
     if (tabId === "tab-members") loadMembers();
     if (tabId === "tab-collections") loadCollections();
+    if (tabId === "tab-championships") loadChampionships();
+    if (tabId === "tab-matches") {
+        await loadChampionships();
+        loadMatches();
+    }
+    if (tabId === "tab-news") loadNews();
     if (tabId === "tab-overview") loadOverviewStats();
 }
 
@@ -139,6 +148,7 @@ function switchTab(tabId) {
 // ==========================================
 async function loadInitialData() {
     await loadCollections(); // Carrega coleções primeiro para mapear nomes nos cards
+    await loadChampionships(); // Carrega campeonatos no início
     loadOverviewStats();
 }
 
@@ -419,12 +429,23 @@ function initModalControls() {
     document.getElementById("btn-close-player-modal").addEventListener("click", () => closeModal("modal-player"));
     document.getElementById("btn-close-member-modal").addEventListener("click", () => closeModal("modal-member"));
     document.getElementById("btn-close-col-modal").addEventListener("click", () => closeModal("modal-collection"));
+    document.getElementById("btn-close-championship-modal").addEventListener("click", () => closeModal("modal-championship"));
+    document.getElementById("btn-close-match-modal").addEventListener("click", () => closeModal("modal-match"));
+    document.getElementById("btn-close-news-modal").addEventListener("click", () => closeModal("modal-news"));
     
     document.getElementById("btn-cancel-player").addEventListener("click", () => closeModal("modal-player"));
     document.getElementById("btn-cancel-col").addEventListener("click", () => closeModal("modal-collection"));
+    document.getElementById("btn-cancel-championship").addEventListener("click", () => closeModal("modal-championship"));
+    document.getElementById("btn-cancel-match").addEventListener("click", () => closeModal("modal-match"));
+    document.getElementById("btn-cancel-news").addEventListener("click", () => closeModal("modal-news"));
     
     document.getElementById("btn-add-player").addEventListener("click", () => openPlayerModal());
     document.getElementById("btn-add-collection").addEventListener("click", () => openCollectionModal());
+    document.getElementById("btn-add-championship").addEventListener("click", () => openChampionshipModal());
+    document.getElementById("btn-add-match").addEventListener("click", () => openMatchModal());
+    document.getElementById("btn-add-news").addEventListener("click", () => openNewsModal());
+
+    document.getElementById("filter-match-championship").addEventListener("change", () => loadMatches());
 }
 
 function openModal(modalId) {
@@ -664,6 +685,114 @@ document.getElementById("btn-submit-give-player").addEventListener("click", asyn
 // SUBMIT DE FORMULÁRIOS
 // ==========================================
 function initFormHandlers() {
+    // Form Campeonato
+    document.getElementById("form-championship").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("championship-id").value;
+        const nome = document.getElementById("championship-name").value;
+        const logoUrl = document.getElementById("championship-logo-url").value;
+        const logoFile = document.getElementById("championship-logo-file").files[0];
+        const ativo = document.getElementById("championship-active").checked;
+
+        const formData = new FormData();
+        if (id) formData.append("id", id);
+        formData.append("nome", nome);
+        formData.append("logo_url", logoUrl);
+        if (logoFile) formData.append("logo_file", logoFile);
+        formData.append("ativo", ativo ? "true" : "false");
+
+        try {
+            const res = await fetch("/api/campeonatos", {
+                method: "POST",
+                body: formData
+            });
+            if (res.ok) {
+                showToast("Campeonato salvo com sucesso!", "success");
+                closeModal("modal-championship");
+                loadChampionships();
+            } else {
+                showToast(await res.text(), "error");
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Erro de rede ao salvar campeonato.", "error");
+        }
+    });
+
+    // Form Jogo
+    document.getElementById("form-match").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("match-id").value;
+        const campeonato_id = document.getElementById("match-championship").value;
+        const rodada = document.getElementById("match-round").value;
+        const time_casa = document.getElementById("match-home").value;
+        const time_fora = document.getElementById("match-away").value;
+        const gols_casa = document.getElementById("match-gols-home").value;
+        const gols_fora = document.getElementById("match-gols-away").value;
+        const video_url = document.getElementById("match-video").value;
+        const data_jogo = document.getElementById("match-date").value;
+        const encerrada = document.getElementById("match-ended").checked;
+
+        const payload = {
+            id, campeonato_id, rodada, time_casa, time_fora,
+            gols_casa, gols_fora, video_url, data_jogo, encerrada
+        };
+
+        try {
+            const res = await fetch("/api/partidas", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                showToast("Partida salva com sucesso!", "success");
+                closeModal("modal-match");
+                loadMatches();
+            } else {
+                showToast(await res.text(), "error");
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Erro ao salvar partida.", "error");
+        }
+    });
+
+    // Form Notícia
+    document.getElementById("form-news").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("news-id").value;
+        const titulo = document.getElementById("news-title").value;
+        const subtitulo = document.getElementById("news-subtitle").value;
+        const imagemUrl = document.getElementById("news-image-url").value;
+        const imagemFile = document.getElementById("news-image-file").files[0];
+        const conteudo = document.getElementById("news-content").value;
+
+        const formData = new FormData();
+        if (id) formData.append("id", id);
+        formData.append("titulo", titulo);
+        formData.append("subtitulo", subtitulo);
+        formData.append("imagem_url", imagemUrl);
+        if (imagemFile) formData.append("imagem_file", imagemFile);
+        formData.append("conteudo", conteudo);
+
+        try {
+            const res = await fetch("/api/noticias", {
+                method: "POST",
+                body: formData
+            });
+            if (res.ok) {
+                showToast("Notícia publicada com sucesso!", "success");
+                closeModal("modal-news");
+                loadNews();
+            } else {
+                showToast(await res.text(), "error");
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Erro ao publicar notícia.", "error");
+        }
+    });
+
     // Form Jogador (Criar / Editar)
     document.getElementById("form-player").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -805,3 +934,326 @@ function showToast(message, type = "info") {
         });
     }, 4000);
 }
+
+
+// ==========================================
+// CAMPEONATOS (CRUD)
+// ==========================================
+let allChampionships = [];
+
+async function loadChampionships() {
+    try {
+        const res = await fetch("/api/public/campeonatos");
+        if (res.ok) {
+            allChampionships = await res.json();
+            updateChampionshipDropdowns();
+            renderChampionshipsList();
+        }
+    } catch (err) {
+        console.error("Erro ao carregar campeonatos:", err);
+    }
+}
+
+function updateChampionshipDropdowns() {
+    const filterSelect = document.getElementById("filter-match-championship");
+    const modalSelect = document.getElementById("match-championship");
+    
+    if (!filterSelect || !modalSelect) return;
+
+    const filterVal = filterSelect.value;
+    const modalVal = modalSelect.value;
+
+    filterSelect.innerHTML = '<option value="">Filtrar por Campeonato (Todos)</option>';
+    modalSelect.innerHTML = '<option value="">Selecione um campeonato...</option>';
+
+    allChampionships.forEach(c => {
+        const optText = c.nome;
+        filterSelect.innerHTML += `<option value="${c.id}">${optText}</option>`;
+        modalSelect.innerHTML += `<option value="${c.id}">${optText}</option>`;
+    });
+
+    filterSelect.value = filterVal;
+    modalSelect.value = modalVal;
+}
+
+function renderChampionshipsList() {
+    const listContainer = document.getElementById("championships-list");
+    if (!listContainer) return;
+
+    if (allChampionships.length === 0) {
+        listContainer.innerHTML = '<div class="no-data-card glass">Nenhum campeonato cadastrado ainda.</div>';
+        return;
+    }
+
+    listContainer.innerHTML = allChampionships.map(c => {
+        const logo = c.logo_url || "https://i.ibb.co/C5B7BBjS/image.png";
+        return `
+            <div class="col-card glass">
+                <div class="col-card-header">
+                    <img src="${logo}" alt="${c.nome}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.05);" onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'">
+                    <div style="flex: 1; margin-left: 0.75rem;">
+                        <h4 style="font-weight:600; font-size:1.05rem;">${c.nome}</h4>
+                        <span class="badge ${c.ativo ? 'badge-success' : 'badge-danger'}" style="font-size:0.7rem; padding: 0.15rem 0.5rem; border-radius: 20px; display: inline-block; margin-top: 0.25rem;">
+                            ${c.ativo ? 'Ativo' : 'Inativo'}
+                        </span>
+                    </div>
+                    <div class="col-card-actions">
+                        <button class="btn-icon btn-edit-col" onclick="editChampionship('${c.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn-icon btn-delete-col" onclick="deleteChampionship('${c.id}', '${c.nome}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function openChampionshipModal(editId = null) {
+    const form = document.getElementById("form-championship");
+    form.reset();
+    document.getElementById("championship-id").value = "";
+    document.getElementById("modal-championship-title").textContent = "Novo Campeonato";
+
+    if (editId) {
+        const c = allChampionships.find(item => item.id === editId);
+        if (c) {
+            document.getElementById("championship-id").value = c.id;
+            document.getElementById("championship-name").value = c.nome;
+            document.getElementById("championship-logo-url").value = c.logo_url || "";
+            document.getElementById("championship-active").checked = !!c.ativo;
+            document.getElementById("modal-championship-title").textContent = "Editar Campeonato";
+        }
+    }
+    openModal("modal-championship");
+}
+
+window.editChampionship = function(id) {
+    openChampionshipModal(id);
+};
+
+window.deleteChampionship = async function(id, name) {
+    if (!confirm(`Deseja realmente deletar o campeonato "${name}"? Todas as partidas vinculadas a ele serão excluídas!`)) return;
+    try {
+        const res = await fetch(`/api/campeonatos/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Campeonato deletado com sucesso!", "success");
+            loadChampionships();
+        } else {
+            showToast(await res.text(), "error");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Erro de rede ao deletar campeonato.", "error");
+    }
+};
+
+
+// ==========================================
+// JOGOS E PARTIDAS (CRUD)
+// ==========================================
+let allMatches = [];
+
+async function loadMatches() {
+    try {
+        const filterChampionship = document.getElementById("filter-match-championship").value;
+        let url = "/api/public/partidas";
+        if (filterChampionship) {
+            url += `?campeonato_id=${filterChampionship}`;
+        }
+        const res = await fetch(url);
+        if (res.ok) {
+            allMatches = await res.json();
+            renderMatchesList();
+        }
+    } catch (err) {
+        console.error("Erro ao carregar partidas:", err);
+    }
+}
+
+function renderMatchesList() {
+    const tbody = document.getElementById("matches-list");
+    if (!tbody) return;
+
+    if (allMatches.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-secondary);">Nenhuma partida cadastrada ou correspondente ao filtro.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = allMatches.map(m => {
+        const champ = allChampionships.find(c => c.id === m.campeonato_id);
+        const champName = champ ? champ.nome : "Desconhecido";
+        
+        let scoreText = "-";
+        if (m.gols_casa !== null && m.gols_fora !== null) {
+            scoreText = `${m.gols_casa} x ${m.gols_fora}`;
+        }
+
+        const dateStr = m.data_jogo ? new Date(m.data_jogo).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : "Não agendado";
+        
+        return `
+            <tr>
+                <td style="font-weight: 600;">${champName}</td>
+                <td>${m.rodada}</td>
+                <td>
+                    <div style="display: flex; flex-direction: column; gap: 0.15rem;">
+                        <span>🏠 <b>${m.time_casa}</b></span>
+                        <span>🚌 <b>${m.time_fora}</b></span>
+                    </div>
+                </td>
+                <td style="font-weight: 800; font-size: 1.05rem; color: var(--accent-color);">${scoreText}</td>
+                <td>
+                    <span class="badge ${m.encerrada ? 'badge-success' : 'badge-warning'}">
+                        ${m.encerrada ? 'Encerrada' : 'Em Andamento'}
+                    </span>
+                    <div style="font-size:0.7rem; color:var(--text-secondary); margin-top: 0.25rem;">${dateStr}</div>
+                </td>
+                <td>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn-icon" onclick="editMatch('${m.id}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn-icon text-danger" onclick="deleteMatch('${m.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function openMatchModal(editId = null) {
+    const form = document.getElementById("form-match");
+    form.reset();
+    document.getElementById("match-id").value = "";
+    document.getElementById("modal-match-title").textContent = "Novo Jogo";
+
+    if (editId) {
+        const m = allMatches.find(item => item.id === editId);
+        if (m) {
+            document.getElementById("match-id").value = m.id;
+            document.getElementById("match-championship").value = m.campeonato_id;
+            document.getElementById("match-round").value = m.rodada;
+            document.getElementById("match-home").value = m.time_casa;
+            document.getElementById("match-away").value = m.time_fora;
+            document.getElementById("match-gols-home").value = m.gols_casa !== null ? m.gols_casa : "";
+            document.getElementById("match-gols-away").value = m.gols_fora !== null ? m.gols_fora : "";
+            document.getElementById("match-video").value = m.video_url || "";
+            
+            if (m.data_jogo) {
+                const d = new Date(m.data_jogo);
+                const localISO = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                document.getElementById("match-date").value = localISO;
+            } else {
+                document.getElementById("match-date").value = "";
+            }
+            document.getElementById("match-ended").checked = !!m.encerrada;
+            document.getElementById("modal-match-title").textContent = "Editar Jogo";
+        }
+    }
+    openModal("modal-match");
+}
+
+window.editMatch = function(id) {
+    openMatchModal(id);
+};
+
+window.deleteMatch = async function(id) {
+    if (!confirm("Deseja realmente excluir esta partida?")) return;
+    try {
+        const res = await fetch(`/api/partidas/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Partida excluída com sucesso!", "success");
+            loadMatches();
+        } else {
+            showToast(await res.text(), "error");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Erro ao excluir partida.", "error");
+    }
+};
+
+
+// ==========================================
+// NOTÍCIAS (CRUD)
+// ==========================================
+let allNews = [];
+
+async function loadNews() {
+    try {
+        const res = await fetch("/api/public/noticias");
+        if (res.ok) {
+            allNews = await res.json();
+            renderNewsList();
+        }
+    } catch (err) {
+        console.error("Erro ao carregar notícias:", err);
+    }
+}
+
+function renderNewsList() {
+    const listContainer = document.getElementById("news-list");
+    if (!listContainer) return;
+
+    if (allNews.length === 0) {
+        listContainer.innerHTML = '<div class="no-data-card glass">Nenhuma notícia publicada ainda.</div>';
+        return;
+    }
+
+    listContainer.innerHTML = allNews.map(n => {
+        const cover = n.imagem_url || "https://i.ibb.co/C5B7BBjS/image.png";
+        const dateStr = n.data_publicacao ? new Date(n.data_publicacao).toLocaleDateString('pt-BR', { dateStyle: 'long' }) : "";
+        return `
+            <div class="col-card glass" style="display:flex; flex-direction:column; padding:0; overflow:hidden;">
+                <img src="${cover}" alt="${n.titulo}" style="width:100%; height:140px; object-fit:cover;" onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'">
+                <div style="padding:1.25rem; flex:1; display:flex; flex-direction:column; gap:0.5rem;">
+                    <div style="font-size:0.75rem; color:var(--text-secondary);">${dateStr}</div>
+                    <h4 style="font-weight:600; font-size:1.1rem; line-height:1.3;">${n.titulo}</h4>
+                    <p style="font-size:0.85rem; color:var(--text-secondary); line-height:1.4; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;">
+                        ${n.subtitulo || n.conteudo}
+                    </p>
+                    <div style="margin-top:auto; display:flex; justify-content:flex-end; gap:0.5rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.04);">
+                        <button class="btn-icon" onclick="editNews('${n.id}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn-icon text-danger" onclick="deleteNews('${n.id}', '${n.titulo}')" title="Deletar"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function openNewsModal(editId = null) {
+    const form = document.getElementById("form-news");
+    form.reset();
+    document.getElementById("news-id").value = "";
+    document.getElementById("modal-news-title").textContent = "Nova Notícia";
+
+    if (editId) {
+        const n = allNews.find(item => item.id === editId);
+        if (n) {
+            document.getElementById("news-id").value = n.id;
+            document.getElementById("news-title").value = n.titulo;
+            document.getElementById("news-subtitle").value = n.subtitulo || "";
+            document.getElementById("news-image-url").value = n.imagem_url || "";
+            document.getElementById("news-content").value = n.conteudo;
+            document.getElementById("modal-news-title").textContent = "Editar Notícia";
+        }
+    }
+    openModal("modal-news");
+}
+
+window.editNews = function(id) {
+    openNewsModal(id);
+};
+
+window.deleteNews = async function(id, title) {
+    if (!confirm(`Deseja realmente deletar a notícia "${title}"?`)) return;
+    try {
+        const res = await fetch(`/api/noticias/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Notícia deletada com sucesso!", "success");
+            loadNews();
+        } else {
+            showToast(await res.text(), "error");
+        }
+    } catch (err) {
+        console.error(err);
+        showToast("Erro ao deletar notícia.", "error");
+    }
+};

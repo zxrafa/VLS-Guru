@@ -639,21 +639,71 @@ class TimeView(discord.ui.View):
         if not inventory:
             return await interaction.followup.send("❌ Você não tem jogadores no elenco.", ephemeral=True)
 
+        # ── Grupos posicionais para fallback controlado ──────────────────────
+        _POS_GROUPS = {
+            "GK":  ["GK"],
+            "DEF": ["CB", "LB", "RB", "LWB", "RWB"],
+            "MID": ["CDM", "CM", "CAM", "LM", "RM", "LW", "RW"],
+            "ATK": ["ST", "CF"],
+        }
+
+        def _get_group(pos: str) -> str:
+            pu = (pos or "").upper()
+            for grp, members in _POS_GROUPS.items():
+                if pu in members:
+                    return grp
+            return "MID"
+
+        def _player_pos(p: dict) -> str:
+            return (p.get("original_pos") or p.get("pos") or "").upper()
+
+        def _base(slot: str) -> str:
+            return ''.join(c for c in slot if not c.isdigit())
+
         used_ids = set()
         new_xi = []
 
         for slot_pos in slots:
-            base_pos = ''.join([c for c in slot_pos if not c.isdigit()])
-            compatible_tags = POSITION_COMPATIBILITY.get(base_pos, [base_pos])
-            # Filtra jogadores compatíveis que ainda não foram escalados
+            base = _base(slot_pos)
+            base_up = base.upper()
+            slot_group = _get_group(base_up)
+
+            # Camada 1 — posição exata
             candidates = [
                 p for p in inventory
-                if p.get("original_pos", p.get("pos")) in compatible_tags
+                if _player_pos(p) == base_up
                 and p.get("instance_id") not in used_ids
             ]
+
+            # Camada 2 — posições compatíveis (POSITION_COMPATIBILITY)
             if not candidates:
-                # Fallback: qualquer jogador não escalado
-                candidates = [p for p in inventory if p.get("instance_id") not in used_ids]
+                compat = [t.upper() for t in POSITION_COMPATIBILITY.get(base, [base])]
+                candidates = [
+                    p for p in inventory
+                    if _player_pos(p) in compat
+                    and p.get("instance_id") not in used_ids
+                ]
+
+            # Camada 3 — mesmo grupo posicional (DEF / MID / ATK / GK)
+            if not candidates:
+                candidates = [
+                    p for p in inventory
+                    if _get_group(_player_pos(p)) == slot_group
+                    and p.get("instance_id") not in used_ids
+                ]
+
+            # Camada 4 — qualquer jogador de campo (NUNCA escala GK fora do gol nem mistura grupos)
+            if not candidates:
+                if slot_group == "GK":
+                    # Slot de GK sem GK disponível → deixa vazio
+                    candidates = []
+                else:
+                    # Qualquer jogador que não seja GK
+                    candidates = [
+                        p for p in inventory
+                        if _player_pos(p) != "GK"
+                        and p.get("instance_id") not in used_ids
+                    ]
 
             if candidates:
                 best = max(candidates, key=lambda x: x.get("over", 0))

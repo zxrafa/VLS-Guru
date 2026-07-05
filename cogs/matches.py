@@ -389,10 +389,11 @@ class MatchesCog(commands.Cog, name="Partidas"):
 
         view = ChallengeResponseView(interaction.user, usuario, self, wager=0)
         await interaction.response.send_message(
-            f"⚔️ **DESAFIO LANÇADO!** {interaction.user.mention} desafia {usuario.mention} para um confronto amistoso!\n"
+            f"\u2694\ufe0f **DESAFIO LANÇADO!** {interaction.user.mention} desafia {usuario.mention} para um confronto amistoso!\n"
             f"*{usuario.display_name}, clique em **Aceitar** para confirmar o confronto.*",
             view=view,
         )
+        view.message = await interaction.original_response()
 
     @app_commands.command(name="x1_aposta", description="Desafia outro membro para uma partida com aposta em dinheiro.")
     @app_commands.describe(usuario="O adversário desafiado", aposta="Valor apostado por cada clube (R$)")
@@ -421,6 +422,7 @@ class MatchesCog(commands.Cog, name="Partidas"):
             f"*{usuario.display_name}, você tem 60 segundos para aceitar.*",
             view=view,
         )
+        view.message = await interaction.original_response()
 
     @app_commands.command(name="treino", description="Realiza um treino contra a CPU para aumentar a afinidade dos titulares (cooldown: 5 min).")
     async def treino(self, interaction: discord.Interaction):

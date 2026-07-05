@@ -55,21 +55,29 @@ POSITIONS_ALL = [
 ]
 
 POSITION_COMPATIBILITY = {
-    "GK": ["GK"],
-    "CB": ["CB", "LB", "RB"],
-    "LB": ["LB", "CB"],
-    "RB": ["RB", "CB"],
-    "LWB": ["LWB", "LB", "LM"],
-    "RWB": ["RWB", "RB", "RM"],
-    "CDM": ["CDM", "CM"],
-    "CM": ["CM", "CAM", "CDM", "LM", "RM"],
-    "CAM": ["CAM", "CM"],
-    "LM": ["LM", "CM", "LW"],
-    "RM": ["RM", "CM", "RW"],
-    "LW": ["LW", "LM"],
-    "RW": ["RW", "RM"],
-    "ST": ["ST", "CF"],
-    "CF": ["CF", "ST"],
+    # Goleiro — só joga de GK
+    "GK":  ["GK"],
+    # Zagueiros
+    "CB":  ["CB", "LB", "RB"],
+    "LB":  ["LB", "CB", "CDM"],
+    "RB":  ["RB", "CB", "CDM"],
+    "LWB": ["LWB", "LB", "LM", "CDM"],
+    "RWB": ["RWB", "RB", "RM", "CDM"],
+    # Meias defensivos — jogam de CM, Laterais e Meias pelos lados
+    "CDM": ["CDM", "CM", "LB", "RB", "LM", "RM"],
+    # Meia central — joga de CAM, CDM e meias pelos lados
+    "CM":  ["CM", "CAM", "CDM", "LM", "RM", "LW", "RW"],
+    # Meia atacante — joga de CM, meias pelos lados e CDM
+    "CAM": ["CAM", "CM", "LM", "RM", "CDM"],
+    # Meias pelos lados
+    "LM":  ["LM", "CM", "CAM", "CDM", "LW"],
+    "RM":  ["RM", "CM", "CAM", "CDM", "RW"],
+    # Pontas — LW↔RW são intercambiáveis
+    "LW":  ["LW", "LM", "RW", "ST"],
+    "RW":  ["RW", "RM", "LW", "ST"],
+    # Atacantes — ST joga de LW e RW também
+    "ST":  ["ST", "CF", "LW", "RW"],
+    "CF":  ["CF", "ST", "CAM"],
 }
 
 # Táticas de Time

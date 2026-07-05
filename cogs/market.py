@@ -341,6 +341,28 @@ class MarketCog(commands.Cog, name="Mercado"):
         else:
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
+    @app_commands.command(name="multisell", description="Vende vários jogadores de uma vez para a CPU.")
+    @lock_user()
+    async def multisell(self, interaction: discord.Interaction):
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+
+        if not inventory:
+            return await interaction.response.send_message("❌ Seu elenco está vazio.", ephemeral=True)
+
+        collections = await db_get_prefix("col_")
+        col_multipliers = {c["id"]: c.get("preco_adicional_pct", 0) for c in collections}
+
+        view = MultiSellView(interaction.user.id, inventory, col_multipliers)
+        total_pages = view.total_pages
+        await interaction.response.send_message(
+            f"🗑️ **Venda em Massa** — Selecione os jogadores que deseja vender.\n"
+            f"O valor de cada um é **15%** do preço de mercado.\n"
+            f"*(Página 1/{total_pages} • {len(inventory)} jogadores no elenco)*",
+            view=view,
+            ephemeral=True,
+        )
+
     @app_commands.command(name="mercado", description="Lista todos os jogadores disponíveis no catálogo global de transferências.")
     async def mercado(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -413,6 +435,106 @@ class MarketCog(commands.Cog, name="Mercado"):
             view.message = await interaction.followup.send(embed=embed, file=file, view=view)
         else:
             view.message = await interaction.followup.send(embed=embed, view=view)
+
+
+# ── Multi-Sell: vender vários jogadores de uma vez ────────────────────────────
+
+class MultiSellSelect(discord.ui.Select):
+    """Dropdown multi-select com até 25 jogadores do inventário."""
+    def __init__(self, owner_id: int, inventory: list, col_multipliers: dict, page: int = 0):
+        self.owner_id = owner_id
+        self.col_multipliers = col_multipliers
+        self.all_players = sorted(inventory, key=lambda x: x.get("over", 0), reverse=True)
+        self.page = page
+
+        start = page * 25
+        chunk = self.all_players[start : start + 25]
+
+        options = []
+        for p in chunk:
+            preco = calculate_quick_sell(p, col_multipliers)
+            label = f"{p['name'][:50]} (OVR {p.get('over','?')})"
+            desc  = f"Vender por R$ {preco:,}"
+            options.append(
+                discord.SelectOption(label=label, value=p["instance_id"], description=desc)
+            )
+
+        super().__init__(
+            placeholder="Selecione os jogadores para vender (pode selecionar vários)...",
+            options=options,
+            min_values=1,
+            max_values=len(options),
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Você não pode interagir aqui.", ephemeral=True)
+
+        await interaction.response.defer()
+
+        selected_ids = set(self.values)
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+
+        to_sell = [p for p in inventory if p.get("instance_id") in selected_ids]
+        if not to_sell:
+            return await interaction.followup.send("❌ Nenhum jogador selecionado foi encontrado no seu inventário.", ephemeral=True)
+
+        total = sum(calculate_quick_sell(p, self.col_multipliers) for p in to_sell)
+
+        # Remove do inventário e do XI
+        sold_ids = {p["instance_id"] for p in to_sell}
+        profile["inventory"]   = [p for p in inventory if p.get("instance_id") not in sold_ids]
+        profile["starting_xi"] = [p for p in profile.get("starting_xi", []) if p.get("instance_id") not in sold_ids]
+        profile["money"]       = profile.get("money", 0) + total
+
+        await save_user_profile(interaction.user.id, profile)
+
+        names = "\n".join(f"• {p['name']} (OVR {p.get('over','?')})" for p in to_sell)
+        embed = discord.Embed(
+            title="💰 Venda em Massa Concluída!",
+            description=f"**{len(to_sell)} jogadores** vendidos para a CPU por um total de **R$ {total:,}**!\n\n{names}",
+            color=discord.Color.green(),
+        )
+        embed.set_footer(text=f"Saldo atual: R$ {profile['money']:,}")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+
+class MultiSellView(discord.ui.View):
+    def __init__(self, owner_id: int, inventory: list, col_multipliers: dict, page: int = 0):
+        super().__init__(timeout=120)
+        self.owner_id       = owner_id
+        self.inventory      = inventory
+        self.col_multipliers = col_multipliers
+        self.page           = page
+        self.total_pages    = max(1, (len(inventory) + 24) // 25)
+        self._rebuild()
+
+    def _rebuild(self):
+        self.clear_items()
+        self.add_item(MultiSellSelect(self.owner_id, self.inventory, self.col_multipliers, self.page))
+        if self.total_pages > 1:
+            prev_btn = discord.ui.Button(label="◀ Anterior", style=discord.ButtonStyle.secondary, disabled=(self.page == 0))
+            next_btn = discord.ui.Button(label="Próxima ▶", style=discord.ButtonStyle.secondary, disabled=(self.page >= self.total_pages - 1))
+
+            async def prev_cb(interaction: discord.Interaction, btn=prev_btn):
+                if interaction.user.id != self.owner_id:
+                    return await interaction.response.send_message("❌", ephemeral=True)
+                self.page -= 1
+                self._rebuild()
+                await interaction.response.edit_message(content=f"Página {self.page+1}/{self.total_pages}", view=self)
+
+            async def next_cb(interaction: discord.Interaction, btn=next_btn):
+                if interaction.user.id != self.owner_id:
+                    return await interaction.response.send_message("❌", ephemeral=True)
+                self.page += 1
+                self._rebuild()
+                await interaction.response.edit_message(content=f"Página {self.page+1}/{self.total_pages}", view=self)
+
+            prev_btn.callback = prev_cb
+            next_btn.callback = next_cb
+            self.add_item(prev_btn)
+            self.add_item(next_btn)
 
 
 async def setup(bot):

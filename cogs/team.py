@@ -830,10 +830,18 @@ class PositionSelect(discord.ui.Select):
             base_pos = ''.join([c for c in chosen_pos if not c.isdigit()])
             profile = await get_user_profile(interaction.user)
             eligible_tags = POSITION_COMPATIBILITY.get(base_pos, [base_pos])
-            
+
+            # IDs já escalados em OUTRAS posições (exceto a posição que estamos trocando)
+            xi = profile.get("starting_xi", [])
+            used_ids = {
+                p["instance_id"] for p in xi
+                if p.get("pos") != chosen_pos and "instance_id" in p
+            }
+
             eligible_players = [
                 p for p in profile.get("inventory", [])
-                if p.get("original_pos", p.get("pos")).upper() in [t.upper() for t in eligible_tags]
+                if p.get("original_pos", p.get("pos", "")).upper() in [t.upper() for t in eligible_tags]
+                and p.get("instance_id") not in used_ids
             ][:25]
 
             if not eligible_players:

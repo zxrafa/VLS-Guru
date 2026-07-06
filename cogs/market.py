@@ -19,23 +19,26 @@ from config import VLS_COINS_EMOJI
 def calculate_player_price(player: dict, col_multipliers: dict) -> int:
     over = player.get("over", 75)
     base = max(5000, (over - 50) * 15000)
-    
-    if over <= 79:
-        base = base * 0.65
-    elif 80 <= over <= 82:
+
+    # OVR >= 84 → +85% (carta boa vale mais)
+    if over >= 84:
+        base = base * 1.85
+    # OVR 80-83 → referência
+    elif 80 <= over <= 83:
         base = base * 1.15
-    elif over >= 83:
-        base = base * 1.30
-        
+    # OVR <= 79 → -60% (carta barata)
+    else:
+        base = base * 0.40
+
     col_id = player.get("col_id")
     col_pct = col_multipliers.get(col_id, 0)
-    
+
     multiplier = 1.0 + (col_pct / 100.0)
     return max(5000, int(base * multiplier))
 
 def calculate_quick_sell(player: dict, col_multipliers: dict) -> int:
     market_price = calculate_player_price(player, col_multipliers)
-    return int(market_price * 0.15)
+    return int(market_price * 0.05)
 
 
 class PlayerSellView(discord.ui.View):

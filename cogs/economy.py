@@ -22,21 +22,21 @@ VLS_COINS_EMOJI = '<:VLScoins:1517258837004914848>'
 async def calculate_price(player: dict) -> int:
     over = player.get("over", 75)
     base = max(5000, (over - 50) * 15000)
-    
-    if over <= 79:
-        base = base * 0.65
-    elif 80 <= over <= 82:
+
+    if over >= 84:
+        base = base * 1.85
+    elif 80 <= over <= 83:
         base = base * 1.15
-    elif over >= 83:
-        base = base * 1.30
-        
+    else:
+        base = base * 0.40
+
     col_id = player.get("col_id")
     col_pct = 0
     if col_id:
         col_rec = await db_get(f"col_{col_id}")
         if col_rec:
             col_pct = col_rec["data"].get("preco_adicional_pct", 0)
-            
+
     multiplier = 1.0 + (col_pct / 100.0)
     return max(5000, int(base * multiplier))
 
@@ -212,7 +212,7 @@ class EconomyCog(commands.Cog, name="Economia"):
         embed = await view.make_category_embed()
         await interaction.followup.send(embed=embed, view=view)
 
-    @app_commands.command(name="caixa", description="Abre uma caixa misteriosa grátis a cada 12 horas.")
+    @app_commands.command(name="caixa", description="Abre uma caixa misteriosa grátis a cada 8 horas.")
     @lock_user()
     async def caixa(self, interaction: discord.Interaction):
         import time
@@ -223,9 +223,9 @@ class EconomyCog(commands.Cog, name="Economia"):
         if last_sobre > now:
             last_sobre = 0
 
-        # Cooldown de 12 horas
-        if now - last_sobre < 43200:
-            restante = 43200 - (now - last_sobre)
+        # Cooldown de 8 horas
+        if now - last_sobre < 28800:
+            restante = 28800 - (now - last_sobre)
             horas = int(restante // 3600)
             minutos = int((restante % 3600) // 60)
             return await interaction.response.send_message(

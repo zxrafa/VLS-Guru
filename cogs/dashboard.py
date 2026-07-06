@@ -13,7 +13,7 @@ from datetime import datetime
 from database import (
     db_get, db_upsert, db_delete, get_all_collections,
     get_all_players, get_user_profile, save_user_profile,
-    db_get_prefix, get_missions
+    db_get_prefix, get_missions, get_all_users
 )
 from config import PLAYSTYLE_EMOJIS, POSITIONS_ALL, VLS_COINS_EMOJI
 # Removido gerador automático de cartas
@@ -841,11 +841,11 @@ class PlayerSelectDropdown(discord.ui.Select):
             
         elif self.action_type == "delete":
             nome = data.get("name", doc_id)
-            await db_delete(doc_id)
+            await _delete_player_everywhere(doc_id, nome)
             await interaction.response.edit_message(
                 embed=discord.Embed(
                     title="🗑️ Jogador Deletado",
-                    description=f"O jogador **{nome}** foi removido permanentemente.",
+                    description=f"O jogador **{nome}** foi removido do catálogo e de todos os inventários.",
                     color=discord.Color.red()
                 ),
                 view=None
@@ -977,6 +977,25 @@ class EditarJogadorModal(VLSModal, title="Editar Jogador"):
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
+async def _delete_player_everywhere(player_id: str, player_name: str):
+    """Remove o jogador do catálogo e de todos os inventários/XIs de usuários."""
+    await db_delete(player_id)
+    users = await get_all_users()
+    for u_data in users:
+        uid = u_data.get("user_id")
+        if not uid:
+            continue
+        inventory = u_data.get("inventory", [])
+        # inventory items têm "id" copiado do catálogo
+        new_inv = [item for item in inventory if item.get("id") != player_id]
+        if len(new_inv) != len(inventory):
+            u_data["inventory"] = new_inv
+            u_data["starting_xi"] = [
+                p for p in u_data.get("starting_xi", [])
+                if p.get("id") != player_id
+            ]
+            await save_user_profile(uid, u_data)
+
 class DeletarJogadorModal(VLSModal, title="Deletar Jogador"):
     p_busca = discord.ui.TextInput(label="Nome ou busca do Jogador", placeholder="Ex: Tarik", max_length=50)
     confirmacao = discord.ui.TextInput(label="Digite CONFIRMAR para prosseguir", placeholder="CONFIRMAR", max_length=10)
@@ -995,8 +1014,8 @@ class DeletarJogadorModal(VLSModal, title="Deletar Jogador"):
         if len(matches) == 1:
             doc_id = matches[0]["id"]
             nome = matches[0].get("name", doc_id)
-            await db_delete(doc_id)
-            await interaction.response.send_message(f"🗑️ Jogador **{nome}** removido permanentemente.", ephemeral=True)
+            await _delete_player_everywhere(doc_id, nome)
+            await interaction.response.send_message(f"🗑️ Jogador **{nome}** removido do catálogo e de todos os inventários.", ephemeral=True)
         else:
             view = PlayerSelectDropdownView("delete", matches, interaction.user.id)
             embed = discord.Embed(

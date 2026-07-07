@@ -192,7 +192,7 @@ class ChatCog(commands.Cog, name="Chat"):
                                     err = await self.execute_admin_action(action, params, message.author.id, message)
                                     if err:
                                         return await message.reply(err)
-                                
+
                                 await message.reply(reply_text)
                             except Exception as parse_err:
                                 print(f"Erro ao parsear JSON do Gemini Admin: {parse_err}. Raw: {raw_reply}")

@@ -1477,5 +1477,255 @@ class PlayerScaleCarouselView(discord.ui.View):
             await interaction.response.edit_message(embed=embed, attachments=[], view=self)
 
 
+
+    @app_commands.command(name="fundir", description="Funde cartas reservas para dar XP e fazer upgrade (+3 OVR) em um jogador favorito.")
+    @lock_user()
+    async def fundir(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+        
+        if len(inventory) < 2:
+            return await interaction.followup.send(
+                "❌ Você precisa de pelo menos 2 jogadores no seu inventário para realizar uma fusão.",
+                ephemeral=True
+            )
+            
+        # Sorteia os jogadores por overall decrescente
+        sorted_players = sorted(inventory, key=lambda x: x.get("over", 0), reverse=True)
+        
+        embed = discord.Embed(
+            title="🔮 Fusão de Cartas — Selecionar Alvo",
+            description="Escolha abaixo qual jogador do seu elenco você deseja **EVOLUIR**.\n"
+                        f"Cada fusão custará **10 {VLS_COINS_EMOJI} VLS Coins**.",
+            color=discord.Color.dark_purple()
+        )
+        
+        view = FusaoAlvoView(interaction.user.id, sorted_players)
+        await interaction.followup.send(embed=embed, view=view)
+
+
+class FusaoSacrificioSelect(discord.ui.Select):
+    def __init__(self, owner_id: int, target_player: dict, candidates: list):
+        self.owner_id = owner_id
+        self.target_player = target_player
+        self.candidates = candidates
+        
+        options = []
+        for p in candidates[:25]: # Limite do Discord
+            over = p.get("over", 0)
+            xp_dado = 25 if over <= 79 else (50 if over <= 84 else 75)
+            label = f"{p['name'][:50]} (OVR {over})"
+            desc = f"Fornece +{xp_dado} XP | Coleção: {p.get('col_nome', 'Comum')}"
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=p["instance_id"],
+                    description=desc,
+                    emoji=p.get("col_emoji", "✨")
+                )
+            )
+        super().__init__(placeholder="🔥 Selecione o jogador a ser SACRIFICADO...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Esta fusão não é sua.", ephemeral=True)
+            
+        await interaction.response.defer()
+        
+        sac_id = self.values[0]
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+        
+        alvo_card = next((p for p in inventory if p.get("instance_id") == self.target_player["instance_id"]), None)
+        sac_card = next((p for p in inventory if p.get("instance_id") == sac_id), None)
+        
+        if not alvo_card or not sac_card:
+            return await interaction.followup.send("❌ Um dos jogadores não foi encontrado no inventário.", ephemeral=True)
+            
+        over_sac = sac_card.get("over", 0)
+        xp_ganho = 25 if over_sac <= 79 else (50 if over_sac <= 84 else 75)
+        
+        embed = discord.Embed(
+            title="🔮 Confirmar Fusão de Cartas",
+            description=(
+                f"Você está prestes a realizar a fusão de cartas no VLS Guru.\n\n"
+                f"⭐ **Jogador Alvo (Evolui):** **{alvo_card['name']}** (OVR {alvo_card['over']} ➔ Nível +{alvo_card.get('level_upgrade', 0)})\n"
+                f"🔥 **Jogador Sacrificado (Será DESTRUÍDO):** **{sac_card['name']}** (OVR {over_sac} ➔ Fornece +{xp_ganho} XP)\n\n"
+                f"💰 **Custo da Operação:** **10 {VLS_COINS_EMOJI} VLS Coins**\n\n"
+                f"*Esta ação é irreversível! O jogador sacrificado será removido do seu elenco permanentemente.*"
+            ),
+            color=discord.Color.dark_purple()
+        )
+        
+        view = FusaoConfirmView(self.owner_id, alvo_card["instance_id"], sac_card["instance_id"], xp_ganho)
+        await interaction.edit_original_response(embed=embed, view=view)
+
+
+class FusaoConfirmView(discord.ui.View):
+    def __init__(self, owner_id: int, alvo_id: str, sac_id: str, xp_ganho: int):
+        super().__init__(timeout=60)
+        self.owner_id = owner_id
+        self.alvo_id = alvo_id
+        self.sac_id = sac_id
+        self.xp_ganho = xp_ganho
+
+    @discord.ui.button(label="Confirmar Fusão", style=discord.ButtonStyle.success, emoji="✅")
+    @lock_user()
+    async def confirm_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+            
+        await interaction.response.defer()
+        profile = await get_user_profile(interaction.user)
+        
+        if profile.get("premium_coins", 0) < 10:
+            return await interaction.followup.send(
+                f"❌ Saldo de VLS Coins insuficiente. A fusão custa 10 {VLS_COINS_EMOJI} e você possui {profile.get('premium_coins', 0)}.",
+                ephemeral=True
+            )
+            
+        inventory = profile.get("inventory", [])
+        alvo_card = next((p for p in inventory if p.get("instance_id") == self.alvo_id), None)
+        sac_card = next((p for p in inventory if p.get("instance_id") == self.sac_id), None)
+        
+        if not alvo_card or not sac_card:
+            return await interaction.followup.send("❌ Erro: Um dos jogadores não foi encontrado no inventário.", ephemeral=True)
+            
+        profile["premium_coins"] -= 10
+        profile["inventory"] = [p for p in inventory if p.get("instance_id") != self.sac_id]
+        profile["starting_xi"] = [p for p in profile.get("starting_xi", []) if p.get("instance_id") != self.sac_id]
+        
+        original_over = alvo_card.setdefault("original_over", alvo_card["over"])
+        lvl = alvo_card.get("level_upgrade", 0)
+        
+        xp_atual = alvo_card.get("xp", 0)
+        novo_xp = xp_atual + self.xp_ganho
+        alvo_card["xp"] = novo_xp
+        
+        level_upgraded = False
+        if lvl < 3:
+            novo_lvl = lvl
+            if novo_xp >= 500:
+                novo_lvl = 3
+            elif novo_xp >= 250:
+                novo_lvl = 2
+            elif novo_xp >= 100:
+                novo_lvl = 1
+                
+            if novo_lvl > lvl:
+                diff = novo_lvl - lvl
+                alvo_card["level_upgrade"] = novo_lvl
+                alvo_card["over"] = original_over + novo_lvl
+                level_upgraded = True
+                
+                for key in ["pac", "sho", "pas", "dri", "def", "phy", "div", "han", "kic", "ref", "spd", "pos_stat"]:
+                    if key in alvo_card:
+                        alvo_card[key] = int(alvo_card[key]) + diff
+                        
+        await save_user_profile(interaction.user.id, profile)
+        
+        for child in self.children:
+            child.disabled = True
+            
+        embed = discord.Embed(
+            title="🔮 FUSÃO REALIZADA COM SUCESSO!",
+            description=(
+                f"🎉 A fusão foi concluída!\n\n"
+                f"⭐ **Jogador Alvo:** **{alvo_card['name']}**\n"
+                f"📈 **XP Acumulado:** `{novo_xp}` XP (+{self.xp_ganho} adicionados)\n"
+                f"⭐ **Nível de Upgrade:** `+{alvo_card.get('level_upgrade', 0)}` "
+                f"{'**OVERALL SUBIU!** ⭐' if level_upgraded else ''}\n"
+                f"💪 **Overall Atual:** `{alvo_card['over']}`"
+            ),
+            color=discord.Color.green()
+        )
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.danger, emoji="❌")
+    async def cancel_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+            
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content="❌ Operação de fusão cancelada.", embed=None, view=self)
+
+
+class FusaoAlvoSelect(discord.ui.Select):
+    def __init__(self, owner_id: int, players: list):
+        self.owner_id = owner_id
+        self.players = players
+        
+        options = []
+        for p in players[:25]:
+            label = f"{p['name'][:50]} (OVR {p['over']})"
+            desc = f"Pos: {p['pos']} | Nível: +{p.get('level_upgrade', 0)} ({p.get('xp', 0)} XP)"
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=p["instance_id"],
+                    description=desc,
+                    emoji=p.get("col_emoji", "✨")
+                )
+            )
+        super().__init__(placeholder="⭐ Selecione o jogador que receberá o UPGRADE...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Esta fusão não é sua.", ephemeral=True)
+            
+        await interaction.response.defer()
+        
+        alvo_id = self.values[0]
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+        
+        target_player = next((p for p in inventory if p.get("instance_id") == alvo_id), None)
+        if not target_player:
+            return await interaction.followup.send("❌ Jogador alvo não encontrado no inventário.", ephemeral=True)
+            
+        if target_player.get("level_upgrade", 0) >= 3:
+            return await interaction.followup.send("❌ Este jogador já atingiu o limite máximo de upgrade (+3).", ephemeral=True)
+            
+        starting_ids = {p.get("instance_id") for p in profile.get("starting_xi", [])}
+        candidates = [
+            p for p in inventory
+            if p.get("instance_id") != alvo_id
+            and p.get("instance_id") not in starting_ids
+            and p.get("over", 0) <= 90
+        ]
+        
+        if not candidates:
+            return await interaction.followup.send(
+                "❌ Você não tem nenhuma outra carta reserva (fora dos titulares) com OVR <= 90 para sacrificar.",
+                ephemeral=True
+            )
+            
+        embed = discord.Embed(
+            title="🔮 Fusão de Cartas — Escolher Sacrifício",
+            description=(
+                f"Você escolheu **{target_player['name']}** (OVR {target_player['over']}) para receber o upgrade.\n"
+                f"Agora selecione qual carta você deseja **SACRIFICAR** (será destruída permanentemente).\n\n"
+                f"**Regras de XP do sacrifício:**\n"
+                f"⚪ OVR 0-79: **+25 XP**\n"
+                f"🔵 OVR 80-84: **+50 XP**\n"
+                f"🟣 OVR 85+: **+75 XP**"
+            ),
+            color=discord.Color.dark_purple()
+        )
+        
+        view = discord.ui.View(timeout=120)
+        view.add_item(FusaoSacrificioSelect(self.owner_id, target_player, candidates))
+        await interaction.edit_original_response(embed=embed, view=view)
+
+
+class FusaoAlvoView(discord.ui.View):
+    def __init__(self, owner_id: int, players: list):
+        super().__init__(timeout=120)
+        self.add_item(FusaoAlvoSelect(owner_id, players))
+
+
 async def setup(bot):
     await bot.add_cog(TeamCog(bot))

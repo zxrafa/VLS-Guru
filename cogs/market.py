@@ -8,6 +8,8 @@ from discord.ext import commands
 from discord import app_commands
 import uuid
 from datetime import datetime
+import time
+import random
 
 from database import (
     db_get, db_upsert, db_delete, get_all_players,
@@ -439,6 +441,72 @@ class MarketCog(commands.Cog, name="Mercado"):
         else:
             view.message = await interaction.followup.send(embed=embed, view=view)
 
+    @app_commands.command(name="ofertas", description="Lista 10 jogadores aleatórios com 25% de desconto (atualiza de 12h em 12h).")
+    @lock_user()
+    async def ofertas(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        offers = await db_get("global_offers")
+        now = time.time()
+        
+        if not offers or (now - offers.get("last_update", 0)) >= 43200:
+            all_players = await get_all_players()
+            if not all_players:
+                return await interaction.followup.send("❌ Nenhum jogador cadastrado no catálogo do banco de dados.", ephemeral=True)
+                
+            drawn = random.sample(all_players, min(10, len(all_players)))
+            collections = await db_get_prefix("col_")
+            col_multipliers = {c["id"]: c.get("preco_adicional_pct", 0) for c in collections}
+            
+            ofertas_lista = []
+            for p in drawn:
+                preco_original = calculate_player_price(p, col_multipliers)
+                preco_desconto = int(preco_original * 0.75)
+                
+                p_copy = p.copy()
+                p_copy["preco_original"] = preco_original
+                p_copy["preco_desconto"] = preco_desconto
+                ofertas_lista.append(p_copy)
+                
+            offers = {
+                "last_update": now,
+                "players": ofertas_lista
+            }
+            await db_upsert("global_offers", offers)
+            
+        profile = await get_user_profile(interaction.user)
+        timestamp_ciclo = offers["last_update"]
+        limite = profile.get("ofertas_compradas", {})
+        
+        qtd_comprada = 0
+        if limite.get("ciclo_timestamp") == timestamp_ciclo:
+            qtd_comprada = limite.get("qtd", 0)
+            
+        restante = 43200 - (now - timestamp_ciclo)
+        horas = int(restante // 3600)
+        minutos = int((restante % 3600) // 60)
+        
+        embed = discord.Embed(
+            title="🛒 Mercado de Ofertas Especiais VLS",
+            description=f"Aproveite as ofertas com **25% de desconto**! O ciclo de ofertas atualiza de 12h em 12h.\n"
+                        f"⏳ **Atualização das ofertas em:** {horas}h {minutos}m\n"
+                        f"💰 Seu Saldo: **R$ {profile.get('money', 0):,}**\n"
+                        f"📊 Limite de compras: **{qtd_comprada}/2** comprados neste ciclo.\n\n"
+                        f"**Jogadores Disponíveis nesta rodada:**",
+            color=discord.Color.brand_green()
+        )
+        
+        for p in offers["players"]:
+            col_emoji = p.get("col_emoji", "✨")
+            embed.add_field(
+                name=f"{col_emoji} {p['name']} (OVR {p.get('over', '?')} | {p.get('pos','?')})",
+                value=f"~~R$ {p['preco_original']:,}~~ por **R$ {p['preco_desconto']:,}**",
+                inline=True
+            )
+            
+        view = OfertasView(interaction.user.id, offers["players"])
+        await interaction.followup.send(embed=embed, view=view)
+
 
 # ── Multi-Sell: vender vários jogadores de uma vez ────────────────────────────
 
@@ -538,6 +606,111 @@ class MultiSellView(discord.ui.View):
             next_btn.callback = next_cb
             self.add_item(prev_btn)
             self.add_item(next_btn)
+
+
+
+class OfertasSelect(discord.ui.Select):
+    def __init__(self, owner_id: int, players: list):
+        self.owner_id = owner_id
+        self.players = players
+        
+        options = []
+        for p in players:
+            label = f"{p['name'][:50]} (OVR {p.get('over', '?')})"
+            orig = p["preco_original"]
+            desc = p["preco_desconto"]
+            desc_text = f"De: R$ {orig:,} por R$ {desc:,}"
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=p["id"],
+                    description=desc_text,
+                    emoji=p.get("col_emoji", "✨")
+                )
+            )
+        super().__init__(placeholder="🛒 Selecione um jogador para contratar com 25% de desconto...", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Esta página de ofertas não é sua.", ephemeral=True)
+
+        await interaction.response.defer()
+        
+        selected_id = self.values[0]
+        offers = await db_get("global_offers")
+        if not offers:
+            return await interaction.followup.send("❌ Ofertas expiradas. Use `/ofertas` novamente para recarregar.", ephemeral=True)
+            
+        selected_player = next((p for p in offers["players"] if p.get("id") == selected_id), None)
+        if not selected_player:
+            return await interaction.followup.send("❌ Jogador não encontrado nas ofertas ativas.", ephemeral=True)
+            
+        profile = await get_user_profile(interaction.user)
+        timestamp_ciclo = offers["last_update"]
+        limite = profile.get("ofertas_compradas", {})
+        
+        if limite.get("ciclo_timestamp") == timestamp_ciclo and limite.get("qtd", 0) >= 2:
+            return await interaction.followup.send("❌ Você já comprou o limite máximo de 2 jogadores nesta oferta de 12h!", ephemeral=True)
+            
+        preco = selected_player["preco_desconto"]
+        if profile.get("money", 0) < preco:
+            return await interaction.followup.send(
+                f"❌ Saldo de dinheiro insuficiente. Custa R$ {preco:,} e você possui R$ {profile.get('money', 0):,}.",
+                ephemeral=True
+            )
+            
+        # Desconta e atualiza limites
+        profile["money"] -= preco
+        limite_data = profile.setdefault("ofertas_compradas", {})
+        if limite_data.get("ciclo_timestamp") != timestamp_ciclo:
+            limite_data["ciclo_timestamp"] = timestamp_ciclo
+            limite_data["qtd"] = 0
+        limite_data["qtd"] += 1
+        
+        # Copia jogador para o inventário
+        player_copy = selected_player.copy()
+        player_copy["instance_id"] = str(uuid.uuid4())[:8]
+        player_copy["xp"] = 0
+        player_copy.pop("preco_original", None)
+        player_copy.pop("preco_desconto", None)
+        
+        profile["inventory"].append(player_copy)
+        await save_user_profile(interaction.user.id, profile)
+        
+        await interaction.followup.send(
+            f"🎉 **Contratação de Oferta Concluída!**\n"
+            f"Você comprou **{player_copy['name']}** com 25% de desconto por **R$ {preco:,}**!\n"
+            f"*(Compra {limite_data['qtd']}/2 do ciclo de 12h)*"
+        )
+        
+        restante = 43200 - (time.time() - timestamp_ciclo)
+        horas = int(restante // 3600)
+        minutos = int((restante % 3600) // 60)
+        
+        embed = discord.Embed(
+            title="🛒 Mercado de Ofertas Especiais VLS",
+            description=f"Aproveite as ofertas com **25% de desconto**! O ciclo de ofertas atualiza de 12h em 12h.\n"
+                        f"⏳ **Atualização das ofertas em:** {horas}h {minutos}m\n"
+                        f"💰 Seu Saldo: **R$ {profile.get('money', 0):,}**\n"
+                        f"📊 Limite de compras: **{limite_data['qtd']}/2** comprados neste ciclo.\n\n"
+                        f"**Jogadores Disponíveis nesta rodada:**",
+            color=discord.Color.brand_green()
+        )
+        for p in offers["players"]:
+            col_emoji = p.get("col_emoji", "✨")
+            embed.add_field(
+                name=f"{col_emoji} {p['name']} (OVR {p.get('over', '?')} | {p.get('pos','?')})",
+                value=f"~~R$ {p['preco_original']:,}~~ por **R$ {p['preco_desconto']:,}**",
+                inline=True
+            )
+            
+        await interaction.edit_original_response(embed=embed)
+
+
+class OfertasView(discord.ui.View):
+    def __init__(self, owner_id: int, players: list):
+        super().__init__(timeout=120)
+        self.add_item(OfertasSelect(owner_id, players))
 
 
 async def setup(bot):

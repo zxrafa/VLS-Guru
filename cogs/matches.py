@@ -159,15 +159,31 @@ class MatchesCog(commands.Cog, name="Partidas"):
         # ── Missões ────────────────────────────────────────────────────────────
         econ_cog = self.bot.get_cog("Economia")
         if econ_cog:
+            # P1
             await econ_cog.increment_mission(p1_user.id, p1_profile, "partidas", 1)
             await econ_cog.increment_mission(p1_user.id, p1_profile, "gols", p1_goals)
+            await econ_cog.increment_mission(p1_user.id, p1_profile, "desafios", 1)
             if p1_goals > p2_goals:
                 await econ_cog.increment_mission(p1_user.id, p1_profile, "vitorias", 1)
+            if p2_goals == 0:
+                await econ_cog.increment_mission(p1_user.id, p1_profile, "clean_sheets", 1)
+            if wager > 0:
+                await econ_cog.increment_mission(p1_user.id, p1_profile, "x1_apostado", 1)
+                if wager > 500000:
+                    await econ_cog.increment_mission(p1_user.id, p1_profile, "x1_apostado_500k", 1)
 
+            # P2
             await econ_cog.increment_mission(p2_user.id, p2_profile, "partidas", 1)
             await econ_cog.increment_mission(p2_user.id, p2_profile, "gols", p2_goals)
+            await econ_cog.increment_mission(p2_user.id, p2_profile, "desafios", 1)
             if p2_goals > p1_goals:
                 await econ_cog.increment_mission(p2_user.id, p2_profile, "vitorias", 1)
+            if p1_goals == 0:
+                await econ_cog.increment_mission(p2_user.id, p2_profile, "clean_sheets", 1)
+            if wager > 0:
+                await econ_cog.increment_mission(p2_user.id, p2_profile, "x1_apostado", 1)
+                if wager > 500000:
+                    await econ_cog.increment_mission(p2_user.id, p2_profile, "x1_apostado_500k", 1)
 
         # ── Persistência ───────────────────────────────────────────────────────
         await save_user_profile(p1_user.id, p1_profile)
@@ -220,15 +236,60 @@ class MatchesCog(commands.Cog, name="Partidas"):
                 f"🏟️ **Estádio:** {estadio}\n"
                 f"{clima['emoji']} **Clima:** {clima['nome']}\n\n"
                 f"🔥 **Confronto:** **{p1_name}** x **{p2_name}**\n\n"
-                f"📢 **A bola vai rolar em instantes!** Os jogadores estão finalizando o aquecimento no gramado."
+                f"📢 **A bola vai rolar em instantes!** Veja as escalações das duas equipes abaixo."
             ),
             color=discord.Color.blue()
         )
         embed_pre.set_footer(text="VLS TV • Ao Vivo")
         
-        # Envia a preleção inicial
+        # Envia as escalações em imagem
+        p1_xi = sim_res.get("p1_xi", [])
+        p2_xi = sim_res.get("p2_xi", [])
+        p1_form = sim_res.get("p1_formation", "4-3-3")
+        p2_form = sim_res.get("p2_formation", "4-3-3")
+        
+        p1_chem = calculate_chemistry_bonus(p1_xi, p1_form)
+        p2_chem = calculate_chemistry_bonus(p2_xi, p2_form)
+        
+        p1_ovr = sum(p.get("over", 0) for p in p1_xi) // len(p1_xi) if p1_xi else 0
+        p2_ovr = sum(p.get("over", 0) for p in p2_xi) // len(p2_xi) if p2_xi else 0
+
+        try:
+            from pitch_generator import generate_team_pitch
+            import io
+            
+            buf_p1 = await asyncio.to_thread(
+                generate_team_pitch,
+                starting_xi=p1_xi,
+                formation=p1_form,
+                club_name=p1_name,
+                money=0,
+                overall=p1_ovr,
+                chemistry_bonuses=p1_chem
+            )
+            
+            buf_p2 = await asyncio.to_thread(
+                generate_team_pitch,
+                starting_xi=p2_xi,
+                formation=p2_form,
+                club_name=p2_name,
+                money=0,
+                overall=p2_ovr,
+                chemistry_bonuses=p2_chem
+            )
+            
+            file_p1 = discord.File(fp=buf_p1, filename="p1_pitch.png")
+            file_p2 = discord.File(fp=buf_p2, filename="p2_pitch.png")
+            
+            await interaction.followup.send(
+                content=f"📋 **Escalações Oficiais — {p1_name} x {p2_name}**",
+                files=[file_p1, file_p2]
+            )
+        except Exception as e:
+            print(f"Erro ao gerar imagens das escalações antes do jogo: {e}")
+            
         msg = await interaction.followup.send(embed=embed_pre)
-        await asyncio.sleep(5.0)
+        await asyncio.sleep(6.0)
 
         # --- SIMULAÇÃO TRANSMISSÃO AO VIVO ---
         current_p1_goals = 0
@@ -533,6 +594,8 @@ class MatchesCog(commands.Cog, name="Partidas"):
             p2_tactic = "padrao",
             p1_chem   = p1_chem,
             p2_chem   = cpu_chem,
+            p1_formation = profile.get("formation", "4-3-3"),
+            p2_formation = "4-3-3"
         )
 
         # Recompensa fixa de treino: R$ 3.000 + +1 XP de afinidade por titular
@@ -550,6 +613,10 @@ class MatchesCog(commands.Cog, name="Partidas"):
             pid = slot.get("instance_id")
             if pid and pid in inv_map:
                 slot["xp"] = inv_map[pid].get("xp", slot.get("xp", 0))
+
+        econ_cog = self.bot.get_cog("Economia")
+        if econ_cog:
+            await econ_cog.increment_mission(interaction.user.id, profile, "treinos", 1)
 
         await save_user_profile(interaction.user.id, profile)
 
@@ -828,6 +895,8 @@ class MatchesCog(commands.Cog, name="Partidas"):
                     p2_tactic = p2_prof.get("tactic", "padrao"),
                     p1_chem   = p1_chem,
                     p2_chem   = p2_chem,
+                    p1_formation = p1_prof.get("formation", "4-3-3"),
+                    p2_formation = p2_prof.get("formation", "4-3-3")
                 )
 
                 m["p1_goals"] = sim["p1_goals"]
@@ -949,6 +1018,8 @@ class ChallengeResponseView(discord.ui.View):
             p2_tactic = p2_profile.get("tactic", "padrao"),
             p1_chem   = p1_chem,
             p2_chem   = p2_chem,
+            p1_formation = p1_profile.get("formation", "4-3-3"),
+            p2_formation = p2_profile.get("formation", "4-3-3")
         )
 
         wager_msg = await self.cog.process_match_results(interaction, self.challenger, self.target, sim_res, self.wager)
@@ -1140,6 +1211,473 @@ class CampeonatoAdminView(discord.ui.View):
                 view=None
             )
 
+    # ── MÓDULO 5: DISPUTA DE PÊNALTIS ──────────────────────────────────────────
+
+    @app_commands.command(name="penalti_treino", description="Disputa de pênaltis contra o goleiro da CPU para treinar.")
+    @lock_user()
+    async def penalti_treino(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="⚽ Disputa de Pênaltis (Treino CPU) — Rodada 1/5",
+            description="👤 **Você:** ⚪ ⚪ ⚪ ⚪ ⚪\n"
+                        "🤖 **CPU:** ⚪ ⚪ ⚪ ⚪ ⚪\n\n"
+                        "Escolha o canto do seu chute abaixo para iniciar a disputa!",
+            color=discord.Color.blue()
+        )
+        view = PenaltiTreinoView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="penalti_desafio", description="Desafia outro manager para uma disputa de pênaltis PvP (com ou sem aposta).")
+    @app_commands.describe(adversario="Oponente para desafiar", aposta="Valor opcional de aposta em dinheiro")
+    @lock_user()
+    async def penalti_desafio(self, interaction: discord.Interaction, adversario: discord.Member, aposta: int = 0):
+        if adversario.id == interaction.user.id:
+            return await interaction.response.send_message("❌ Você não pode desafiar a si mesmo.", ephemeral=True)
+            
+        if aposta < 0:
+            return await interaction.response.send_message("❌ O valor da aposta não pode ser negativo.", ephemeral=True)
+            
+        p1 = await get_user_profile(interaction.user)
+        p2 = await get_user_profile(adversario)
+        
+        if aposta > 0:
+            if p1.get("money", 0) < aposta:
+                return await interaction.response.send_message(f"❌ Você não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
+            if p2.get("money", 0) < aposta:
+                return await interaction.response.send_message(f"❌ O adversário não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
+                
+        aposta_txt = f" apostando **R$ {aposta:,}**" if aposta > 0 else ""
+        embed = discord.Embed(
+            title="⚽ Desafio de Pênaltis PvP!",
+            description=f"⚔️ {interaction.user.mention} desafiou {adversario.mention} para uma disputa de pênaltis{aposta_txt}!\n"
+                        f"Clique no botão verde abaixo para aceitar o desafio.",
+            color=discord.Color.purple()
+        )
+        
+        view = PenaltiAceitarView(self, interaction.user, adversario, aposta)
+        await interaction.response.send_message(embed=embed, view=view)
+
+    # ── MÓDULO 6: MODO LIGA ────────────────────────────────────────────────────
+    
+    @app_commands.command(name="liga", description="Exibe seu status no Modo Liga e permite simular partidas contra a CPU.")
+    @app_commands.choices(acao=[
+        app_commands.Choice(name="Visualizar Status", value="status"),
+        app_commands.Choice(name="Jogar Partida", value="jogar")
+    ])
+    @lock_user()
+    async def liga(self, interaction: discord.Interaction, acao: str):
+        await interaction.response.defer()
+        
+        profile = await get_user_profile(interaction.user)
+        div = profile.setdefault("liga_div", "Bronze")
+        wins = profile.setdefault("liga_wins", 0)
+        losses = profile.setdefault("liga_losses", 0)
+        
+        LIGAS_CONFIG = {
+            "Bronze": {"wins_needed": 3, "losses_cair": None, "ovr_min": 70, "ovr_max": 75, "premio_vitoria": 5_000, "proxima": "Prata", "anterior": None},
+            "Prata": {"wins_needed": 5, "losses_cair": None, "ovr_min": 75, "ovr_max": 79, "premio_vitoria": 8_000, "proxima": "Ouro", "anterior": None},
+            "Ouro": {"wins_needed": 7, "losses_cair": 10, "ovr_min": 80, "ovr_max": 84, "premio_vitoria": 12_000, "proxima": "Esmeralda", "anterior": "Prata"},
+            "Esmeralda": {"wins_needed": 10, "losses_cair": 8, "ovr_min": 84, "ovr_max": 87, "premio_vitoria": 15_000, "proxima": "Diamante", "anterior": "Ouro"},
+            "Diamante": {"wins_needed": 13, "losses_cair": 6, "ovr_min": 87, "ovr_max": 90, "premio_vitoria": 20_000, "proxima": "Icone", "anterior": "Esmeralda"},
+            "Icone": {"wins_needed": 15, "losses_cair": 5, "ovr_min": 90, "ovr_max": 93, "premio_vitoria": 25_000, "proxima": "Dev", "anterior": "Diamante"},
+            "Dev": {"wins_needed": 20, "losses_cair": 3, "ovr_min": 93, "ovr_max": 96, "premio_vitoria": 30_000, "proxima": "VLS", "anterior": "Icone"},
+            "VLS": {"wins_needed": None, "losses_cair": None, "ovr_min": 96, "ovr_max": 99, "premio_vitoria": 40_000, "proxima": None, "anterior": None}
+        }
+        
+        config = LIGAS_CONFIG.get(div, LIGAS_CONFIG["Bronze"])
+        
+        if acao == "status":
+            embed = discord.Embed(
+                title=f"🔥 Modo Liga VLS — {div}",
+                description=(
+                    f"🏆 **Divisão Atual:** Liga **{div}**\n\n"
+                    f"📈 **Vitórias consecutivas:** `{wins}` de **{config['wins_needed'] or '—'}** para subir.\n"
+                    f"📉 **Derrotas consecutivas:** `{losses}` de **{config['losses_cair'] or '—'}** para cair.\n\n"
+                    f"💰 **Prêmio por vitória:** R$ {config['premio_vitoria']:,}\n"
+                    f"🎮 **Nível da CPU:** OVR {config['ovr_min']} - {config['ovr_max']}\n\n"
+                    f"Use `/liga jogar` para disputar a próxima rodada com seu time titular!"
+                ),
+                color=discord.Color.brand_green()
+            )
+            embed.set_footer(text="VLS Liga • Suba até o topo")
+            return await interaction.followup.send(embed=embed)
+            
+        starting_xi = profile.get("starting_xi", [])
+        if len(starting_xi) < 11:
+            return await interaction.followup.send(
+                "❌ Você precisa de **11 titulares escalados** no seu `/time` para disputar a liga.",
+                ephemeral=True
+            )
+            
+        cpu_names = {
+            "Bronze": "Bronze United", "Prata": "Prata FC", "Ouro": "Real Ouro",
+            "Esmeralda": "Esmeralda Athletic", "Diamante": "Diamante City",
+            "Icone": "Icones F.C.", "Dev": "Devs F.C.", "VLS": "VLS All Stars"
+        }
+        cpu_name = cpu_names.get(div, "CPU Club")
+        
+        cpu_xi = []
+        posicoes = ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CAM", "LW", "RW", "ST"]
+        for idx, pos in enumerate(posicoes):
+            ovr = random.randint(config["ovr_min"], config["ovr_max"])
+            cpu_xi.append({
+                "instance_id": f"cpu_{idx}",
+                "name": f"CPU {pos} #{idx}",
+                "pos": pos,
+                "over": ovr,
+                "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
+                "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
+                "col_nome": "Comum",
+                "col_emoji": "⚪"
+            })
+            
+        p1_chem = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
+        cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+        
+        sim_res = run_match_simulation(
+            p1_name = profile.get("club_name", "Meu Clube"),
+            p2_name = cpu_name,
+            p1_xi = starting_xi,
+            p2_xi = cpu_xi,
+            p1_tactic = profile.get("tactic", "padrao"),
+            p2_tactic = "padrao",
+            p1_chem = p1_chem,
+            p2_chem = cpu_chem,
+            p1_formation = profile.get("formation", "4-3-3"),
+            p2_formation = "4-3-3"
+        )
+        
+        gols_user = sim_res["p1_goals"]
+        gols_cpu = sim_res["p2_goals"]
+        
+        resultado_txt = ""
+        money_earned = 0
+        
+        if gols_user > gols_cpu:
+            money_earned = config["premio_vitoria"]
+            profile["money"] += money_earned
+            wins += 1
+            losses = 0
+            
+            subiu = False
+            msg_subida = ""
+            if config["wins_needed"] and wins >= config["wins_needed"]:
+                proxima = config["proxima"]
+                profile["liga_div"] = proxima
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = 0
+                subiu = True
+                msg_subida = f"\n🎉 **UPGRADE DE DIVISÃO!** Você subiu para a **Liga {proxima}**!"
+            else:
+                profile["liga_wins"] = wins
+                profile["liga_losses"] = 0
+                
+            resultado_txt = f"🟩 **Vitória!** R$ {money_earned:,} ganhos.\n📈 Sequência de vitórias: **{wins}/{config['wins_needed'] or '—'}**.{msg_subida}"
+            
+        elif gols_user == gols_cpu:
+            money_earned = int(config["premio_vitoria"] * 0.30)
+            profile["money"] += money_earned
+            wins = 0
+            losses = 0
+            profile["liga_wins"] = 0
+            profile["liga_losses"] = 0
+            
+            resultado_txt = f"🟨 **Empate!** R$ {money_earned:,} de consolação.\nSequências resetadas."
+            
+        else:
+            money_earned = int(config["premio_vitoria"] * 0.10)
+            profile["money"] += money_earned
+            wins = 0
+            losses += 1
+            
+            caiu = False
+            msg_queda = ""
+            if config["losses_cair"] and losses >= config["losses_cair"]:
+                anterior = config["anterior"]
+                profile["liga_div"] = anterior
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = 0
+                caiu = True
+                msg_queda = f"\n📉 **REBAIXAMENTO!** Você caiu para a **Liga {anterior}**!"
+            else:
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = losses
+                
+            cair_info = f"({losses}/{config['losses_cair']})" if config["losses_cair"] else ""
+            resultado_txt = f"🟥 **Derrota!** R$ {money_earned:,} de consolação.\n📉 Sequência de derrotas: **{losses}** {cair_info}.{msg_queda}"
+            
+        await save_user_profile(interaction.user.id, profile)
+        
+        await self.show_simulation_pages(
+            interaction = interaction,
+            p1_name     = profile.get("club_name", "Meu Clube"),
+            p2_name     = cpu_name,
+            sim_res     = sim_res,
+            footer_msg  = resultado_txt
+        )
+
+    # ── MÓDULO 3: COPA RELÂMPAGO ──────────────────────────────────────────────
+
+    @app_commands.command(name="copa", description="Abre inscrições para uma nova Copa Relâmpago de 8 vagas com prêmio de R$ 500k.")
+    @lock_user()
+    async def copa(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        doc_id = f"copa_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        
+        if record and record.get("status") in ["waiting", "running"]:
+            return await interaction.followup.send("❌ Já existe uma copa ativa ou em andamento neste servidor.", ephemeral=True)
+            
+        champ = {
+            "status": "waiting",
+            "participants": [],
+            "round": 1,
+            "matches": []
+        }
+        await db_upsert(doc_id, champ)
+        
+        embed = discord.Embed(
+            title="🏆 Copa Relâmpago VLS",
+            description=f"Inscrições Abertas! Disputa mata-mata rápida por eliminatórias de 8 vagas.\n"
+                        f"💰 **Prêmio do Campeão:** R$ **500.000,00**!\n\n"
+                        f"📊 **Inscritos:** **0/8**\n\n"
+                        f"Clique no botão verde abaixo para se inscrever grátis!",
+            color=discord.Color.gold()
+        )
+        
+        view = CopaParticipateView(interaction.guild.id, self)
+        await interaction.followup.send(embed=embed, view=view)
+
+    async def run_copa_simulation(self, channel, guild_id: int):
+        import random
+        doc_id = f"copa_{guild_id}"
+        record = await db_get(doc_id)
+        if not record:
+            return
+            
+        participants = record["participants"]
+        
+        await channel.send("🏆 **A COPA RELÂMPAGO VLS COMEÇOU!** Gerando confrontos das **Quartas de Final**...")
+        await asyncio.sleep(3.0)
+        
+        random.shuffle(participants)
+        confrontos = [{"p1": participants[i], "p2": participants[i+1]} for i in range(0, 8, 2)]
+        
+        vencedores_quartas = []
+        for idx, match in enumerate(confrontos, 1):
+            p1_m = channel.guild.get_member(match["p1"])
+            p2_m = channel.guild.get_member(match["p2"])
+            
+            if not p1_m:
+                vencedores_quartas.append(match["p2"])
+                await channel.send(f"⚠️ **W.O.:** {match['p1']} não encontrado. Vitória de {p2_m.mention if p2_m else match['p2']}!")
+                continue
+            if not p2_m:
+                vencedores_quartas.append(match["p1"])
+                await channel.send(f"⚠️ **W.O.:** {match['p2']} não encontrado. Vitória de {p1_m.mention if p1_m else match['p1']}!")
+                continue
+                
+            p1_prof = await get_user_profile(p1_m)
+            p2_prof = await get_user_profile(p2_m)
+            
+            await channel.send(f"⚡ **Jogo #{idx} — Quartas de Final:** **{p1_prof['club_name']}** vs **{p2_prof['club_name']}**")
+            await asyncio.sleep(2.0)
+            
+            p1_chem = calculate_chemistry_bonus(p1_prof["starting_xi"], p1_prof.get("formation", "4-3-3"))
+            p2_chem = calculate_chemistry_bonus(p2_prof["starting_xi"], p2_prof.get("formation", "4-3-3"))
+            
+            sim_res = run_match_simulation(
+                p1_name = p1_prof["club_name"],
+                p2_name = p2_prof["club_name"],
+                p1_xi = p1_prof["starting_xi"],
+                p2_xi = p2_prof["starting_xi"],
+                p1_tactic = p1_prof.get("tactic", "padrao"),
+                p2_tactic = p2_prof.get("tactic", "padrao"),
+                p1_chem = p1_chem,
+                p2_chem = p2_chem,
+                p1_formation = p1_prof.get("formation", "4-3-3"),
+                p2_formation = p2_prof.get("formation", "4-3-3")
+            )
+            
+            class MockInteraction:
+                def __init__(self, ch):
+                    self.channel = ch
+                    self.followup = self
+                async def send(self, *args, **kwargs):
+                    return await self.channel.send(*args, **kwargs)
+                    
+            mock_inter = MockInteraction(channel)
+            vencedor_id = match["p1"] if sim_res["p1_goals"] >= sim_res["p2_goals"] else match["p2"]
+            vencedores_quartas.append(vencedor_id)
+            
+            venc_m = channel.guild.get_member(vencedor_id)
+            await self.show_simulation_pages(
+                interaction = mock_inter,
+                p1_name     = p1_prof["club_name"],
+                p2_name     = p2_prof["club_name"],
+                sim_res     = sim_res,
+                footer_msg  = f"🏆 **Fim de jogo!** {venc_m.mention if venc_m else 'Vencedor'} classificado para as semifinais!"
+            )
+            await asyncio.sleep(5.0)
+
+        # Semifinal
+        await channel.send("🏆 **Quartas de Final concluídas!** Gerando confrontos das **Semifinais**...")
+        await asyncio.sleep(3.0)
+        
+        confrontos_semi = [{"p1": vencedores_quartas[i], "p2": vencedores_quartas[i+1]} for i in range(0, 4, 2)]
+        vencedores_semi = []
+        
+        for idx, match in enumerate(confrontos_semi, 1):
+            p1_m = channel.guild.get_member(match["p1"])
+            p2_m = channel.guild.get_member(match["p2"])
+            
+            p1_prof = await get_user_profile(p1_m) if p1_m else {"club_name": "W.O."}
+            p2_prof = await get_user_profile(p2_m) if p2_m else {"club_name": "W.O."}
+            
+            await channel.send(f"⚡ **Jogo #{idx} — Semifinal:** **{p1_prof['club_name']}** vs **{p2_prof['club_name']}**")
+            await asyncio.sleep(2.0)
+            
+            p1_chem = calculate_chemistry_bonus(p1_prof.get("starting_xi", []), p1_prof.get("formation", "4-3-3"))
+            p2_chem = calculate_chemistry_bonus(p2_prof.get("starting_xi", []), p2_prof.get("formation", "4-3-3"))
+            
+            sim_res = run_match_simulation(
+                p1_name = p1_prof["club_name"],
+                p2_name = p2_prof["club_name"],
+                p1_xi = p1_prof.get("starting_xi", []),
+                p2_xi = p2_prof.get("starting_xi", []),
+                p1_tactic = p1_prof.get("tactic", "padrao"),
+                p2_tactic = p2_prof.get("tactic", "padrao"),
+                p1_chem = p1_chem,
+                p2_chem = p2_chem,
+                p1_formation = p1_prof.get("formation", "4-3-3"),
+                p2_formation = p2_prof.get("formation", "4-3-3")
+            )
+            
+            class MockInteraction:
+                def __init__(self, ch):
+                    self.channel = ch
+                    self.followup = self
+                async def send(self, *args, **kwargs):
+                    return await self.channel.send(*args, **kwargs)
+                    
+            mock_inter = MockInteraction(channel)
+            vencedor_id = match["p1"] if sim_res["p1_goals"] >= sim_res["p2_goals"] else match["p2"]
+            vencedores_semi.append(vencedor_id)
+            
+            venc_m = channel.guild.get_member(vencedor_id)
+            await self.show_simulation_pages(
+                interaction = mock_inter,
+                p1_name     = p1_prof["club_name"],
+                p2_name     = p2_prof["club_name"],
+                sim_res     = sim_res,
+                footer_msg  = f"🏆 **Fim de jogo!** {venc_m.mention if venc_m else 'Vencedor'} classificado para a Grande Final!"
+            )
+            await asyncio.sleep(5.0)
+
+        # Final
+        p1_final = channel.guild.get_member(vencedores_semi[0])
+        p2_final = channel.guild.get_member(vencedores_semi[1])
+        
+        p1_prof = await get_user_profile(p1_final)
+        p2_prof = await get_user_profile(p2_final)
+        
+        await channel.send(f"👑 **GRANDE FINAL DA COPA RELÂMPAGO!** 👑\n⚔️ **{p1_prof['club_name']}** vs **{p2_prof['club_name']}**\nA bola vai rolar!")
+        await asyncio.sleep(3.0)
+        
+        p1_chem = calculate_chemistry_bonus(p1_prof["starting_xi"], p1_prof.get("formation", "4-3-3"))
+        p2_chem = calculate_chemistry_bonus(p2_prof["starting_xi"], p2_prof.get("formation", "4-3-3"))
+        
+        sim_res = run_match_simulation(
+            p1_name = p1_prof["club_name"],
+            p2_name = p2_prof["club_name"],
+            p1_xi = p1_prof["starting_xi"],
+            p2_xi = p2_prof["starting_xi"],
+            p1_tactic = p1_prof.get("tactic", "padrao"),
+            p2_tactic = p2_prof.get("tactic", "padrao"),
+            p1_chem = p1_chem,
+            p2_chem = p2_chem,
+            p1_formation = p1_prof.get("formation", "4-3-3"),
+            p2_formation = p2_prof.get("formation", "4-3-3")
+        )
+        
+        campeon_id = vencedores_semi[0] if sim_res["p1_goals"] >= sim_res["p2_goals"] else vencedores_semi[1]
+        campeao_m = channel.guild.get_member(campeon_id)
+        
+        p_camp = await get_user_profile(campeao_m)
+        p_camp["money"] += 500_000
+        await save_user_profile(campeon_id, p_camp)
+        
+        class MockInteraction:
+            def __init__(self, ch):
+                self.channel = ch
+                self.followup = self
+            async def send(self, *args, **kwargs):
+                return await self.channel.send(*args, **kwargs)
+                
+        mock_inter = MockInteraction(channel)
+        await self.show_simulation_pages(
+            interaction = mock_inter,
+            p1_name     = p1_prof["club_name"],
+            p2_name     = p2_prof["club_name"],
+            sim_res     = sim_res,
+            footer_msg  = f"👑 **FIM DA COPA!** {campeao_m.mention} venceu a Copa Relâmpago e faturou **R$ 500.000,00**!"
+        )
+        
+        record["status"] = "finished"
+        await db_upsert(doc_id, record)
+
+
+class CopaParticipateView(discord.ui.View):
+    def __init__(self, guild_id: int, cog):
+        super().__init__(timeout=None)
+        self.guild_id = guild_id
+        self.cog = cog
+
+    @discord.ui.button(label="⚽ Inscrever-se na Copa", style=discord.ButtonStyle.success, emoji="🏆", custom_id="copa_participar")
+    @lock_user()
+    async def participar_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        doc_id = f"copa_{self.guild_id}"
+        record = await db_get(doc_id)
+        if not record:
+            return await interaction.response.send_message("❌ Nenhuma copa ativa.", ephemeral=True)
+
+        champ = record
+        if champ.get("status") != "waiting":
+            return await interaction.response.send_message("❌ As inscrições para a copa estão encerradas.", ephemeral=True)
+
+        profile = await get_user_profile(interaction.user)
+        if len(profile.get("starting_xi", [])) < 11:
+            return await interaction.response.send_message(
+                "❌ Você precisa de **11 titulares escalados** no `/time` para disputar a Copa.", ephemeral=True
+            )
+
+        if interaction.user.id in champ["participants"]:
+            return await interaction.response.send_message("✅ Você já está inscrito nesta copa!", ephemeral=True)
+
+        champ["participants"].append(interaction.user.id)
+        
+        if len(champ["participants"]) >= 8:
+            champ["status"] = "running"
+            await db_upsert(doc_id, champ)
+            await interaction.response.send_message("✅ Inscrição confirmada! Você é o 8º jogador. A Copa vai começar!", ephemeral=True)
+            asyncio.create_task(self.cog.run_copa_simulation(interaction.channel, self.guild_id))
+        else:
+            await db_upsert(doc_id, champ)
+            await interaction.response.send_message(
+                f"✅ Inscrito com sucesso! Total de inscritos: **{len(champ['participants'])}/8**",
+                ephemeral=True
+            )
+            
+            embed = discord.Embed(
+                title="🏆 Copa Relâmpago VLS",
+                description=f"Inscrições Abertas! Disputa mata-mata rápida por eliminatórias de 8 vagas.\n"
+                            f"💰 **Prêmio do Campeão:** R$ **500.000,00**!\n\n"
+                            f"📊 **Inscritos:** **{len(champ['participants'])}/8**\n\n"
+                            f"Clique no botão verde abaixo para se inscrever grátis!",
+                color=discord.Color.gold()
+            )
+            await interaction.message.edit(embed=embed)
+
 
 # ══════════════════════════════════════════════════════════
 # Botão "Participar" na Mensagem do Campeonato
@@ -1177,6 +1715,374 @@ class ParticipateView(discord.ui.View):
             f"Total de participantes: **{len(champ['participants'])}**",
             ephemeral=True
         )
+
+
+
+class PenaltiTreinoView(discord.ui.View):
+    def __init__(self, user_id: int):
+        super().__init__(timeout=120)
+        self.user_id = user_id
+        self.chutes_usuario = [] # lista de bool: True=Gol, False=Defesa/Errou
+        self.chutes_cpu = []
+        self.rodada = 1 # 1 a 5
+        self.fase = "chutar" # "chutar" ou "defender"
+        self.user_choice = None
+        self.message = None
+
+    def get_placar_status(self) -> str:
+        def fmt(lst):
+            return " ".join("🟢" if x else "🔴" for x in lst) + " ⚪" * (5 - len(lst))
+        return f"👤 **Você:** {fmt(self.chutes_usuario)}\n🤖 **CPU:** {fmt(self.chutes_cpu)}"
+
+    async def process_turn(self, interaction: discord.Interaction):
+        import random
+        cpu_choice = random.choice(["esquerda", "centro", "direita"])
+        
+        if self.fase == "chutar":
+            if self.user_choice == cpu_choice:
+                self.chutes_usuario.append(False)
+                resultado_txt = f"❌ **Defesa do Goleiro!** Você chutou na **{self.user_choice}** e o goleiro pulou lá!"
+            else:
+                self.chutes_usuario.append(True)
+                resultado_txt = f"⚽ **GOL!** Você chutou na **{self.user_choice}** e o goleiro pulou na **{cpu_choice}**!"
+            
+            self.fase = "defender"
+            embed = discord.Embed(
+                title=f"⚽ Disputa de Pênaltis — Rodada {self.rodada}/5 (Sua vez de defender)",
+                description=f"{resultado_txt}\n\n{self.get_placar_status()}\n\n🤖 A CPU vai chutar! Escolha para qual lado o seu goleiro deve pular:",
+                color=discord.Color.blue()
+            )
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+        else:
+            if self.user_choice == cpu_choice:
+                self.chutes_cpu.append(False)
+                resultado_txt = f"🧤 **DEFENDEU!** A CPU chutou na **{cpu_choice}** e você pulou lá!"
+            else:
+                self.chutes_cpu.append(True)
+                resultado_txt = f"❌ **Gol da CPU.** A CPU chutou na **{cpu_choice}** e você pulou na **{self.user_choice}**!"
+                
+            fim = False
+            vencedor = None
+            
+            rem_user = 5 - len(self.chutes_usuario)
+            rem_cpu = 5 - len(self.chutes_cpu)
+            gols_user = sum(self.chutes_usuario)
+            gols_cpu = sum(self.chutes_cpu)
+            
+            if gols_user > (gols_cpu + rem_cpu):
+                fim = True
+                vencedor = "usuario"
+            elif gols_cpu > (gols_user + rem_user):
+                fim = True
+                vencedor = "cpu"
+            elif len(self.chutes_usuario) >= 5 and len(self.chutes_cpu) >= 5:
+                if gols_user == gols_cpu:
+                    pass
+                else:
+                    fim = True
+                    vencedor = "usuario" if gols_user > gols_cpu else "cpu"
+                    
+            if not fim and len(self.chutes_usuario) >= 5:
+                if len(self.chutes_usuario) == len(self.chutes_cpu):
+                    if gols_user != gols_cpu:
+                        fim = True
+                        vencedor = "usuario" if gols_user > gols_cpu else "cpu"
+                    else:
+                        self.rodada += 1
+                else:
+                    pass
+            elif not fim and self.fase == "defender":
+                self.rodada += 1
+                self.fase = "chutar"
+                
+            if fim:
+                for child in self.children:
+                    child.disabled = True
+                    
+                if vencedor == "usuario":
+                    profile = await get_user_profile(interaction.user)
+                    profile["money"] += 5_000
+                    await save_user_profile(interaction.user.id, profile)
+                    fim_txt = "🏆 **Você venceu a disputa de pênaltis!** Ganhou **R$ 5.000** como recompensa."
+                    color = discord.Color.green()
+                else:
+                    fim_txt = "💀 **A CPU venceu a disputa de pênaltis!** Mais sorte na próxima vez."
+                    color = discord.Color.red()
+                    
+                embed = discord.Embed(
+                    title="🏁 FIM DA DISPUTA DE PÊNALTIS",
+                    description=f"{resultado_txt}\n\n{self.get_placar_status()}\n\n{fim_txt}",
+                    color=color
+                )
+                await interaction.response.edit_message(embed=embed, view=self)
+            else:
+                if self.fase == "chutar":
+                    embed = discord.Embed(
+                        title=f"⚽ Disputa de Pênaltis — Rodada {self.rodada}/5 (Sua vez de chutar)",
+                        description=f"{resultado_txt}\n\n{self.get_placar_status()}\n\nEscolha para onde deseja chutar:",
+                        color=discord.Color.blue()
+                    )
+                    await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Esquerda", style=discord.ButtonStyle.primary, emoji="⬅️")
+    async def esq_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.user_choice = "esquerda"
+        await self.process_turn(interaction)
+
+    @discord.ui.button(label="Centro", style=discord.ButtonStyle.secondary, emoji="⏺️")
+    async def centro_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.user_choice = "centro"
+        await self.process_turn(interaction)
+
+    @discord.ui.button(label="Direita", style=discord.ButtonStyle.primary, emoji="➡️")
+    async def dir_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.user_choice = "direita"
+        await self.process_turn(interaction)
+
+
+class PenaltiEscolhaView(discord.ui.View):
+    def __init__(self, parent_view, role: str):
+        super().__init__(timeout=60)
+        self.parent_view = parent_view
+        self.role = role
+
+    @discord.ui.button(label="Esquerda", style=discord.ButtonStyle.primary, emoji="⬅️")
+    async def esq(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.save_choice(interaction, "esquerda")
+
+    @discord.ui.button(label="Centro", style=discord.ButtonStyle.secondary, emoji="⏺️")
+    async def cen(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.save_choice(interaction, "centro")
+
+    @discord.ui.button(label="Direita", style=discord.ButtonStyle.primary, emoji="➡️")
+    async def dir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.save_choice(interaction, "direita")
+
+    async def save_choice(self, interaction: discord.Interaction, side: str):
+        if self.role == "atk":
+            self.parent_view.choice_atk = side
+        else:
+            self.parent_view.choice_def = side
+            
+        await interaction.response.send_message(f"✅ Você escolheu o canto **{side}** em segredo!", ephemeral=True)
+        await self.parent_view.check_choices(interaction)
+
+
+class PenaltiPvPView(discord.ui.View):
+    def __init__(self, cog, challenger: discord.Member, target: discord.Member, wager: int):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.challenger = challenger
+        self.target = target
+        self.wager = wager
+        
+        self.chutes_challenger = []
+        self.chutes_target = []
+        self.rodada = 1
+        
+        self.atk_player = challenger
+        self.def_player = target
+        
+        self.choice_atk = None
+        self.choice_def = None
+        
+        self.message = None
+
+    def get_placar_status(self) -> str:
+        def fmt(lst):
+            return " ".join("🟢" if x else "🔴" for x in lst) + " ⚪" * (5 - len(lst))
+        return (
+            f"👤 **{self.challenger.display_name}:** {fmt(self.chutes_challenger)}\n"
+            f"👤 **{self.target.display_name}:** {fmt(self.chutes_target)}"
+        )
+
+    @discord.ui.button(label="Chutar (Atacante)", style=discord.ButtonStyle.danger, emoji="⚽")
+    async def btn_chutar(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.atk_player.id:
+            return await interaction.response.send_message("❌ Você não é o cobrador desta rodada!", ephemeral=True)
+        if self.choice_atk is not None:
+            return await interaction.response.send_message("❌ Você já fez sua escolha de chute!", ephemeral=True)
+            
+        view = PenaltiEscolhaView(self, "atk")
+        await interaction.response.send_message("🎯 Escolha o canto do seu chute:", view=view, ephemeral=True)
+
+    @discord.ui.button(label="Defender (Goleiro)", style=discord.ButtonStyle.primary, emoji="🧤")
+    async def btn_defender(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.def_player.id:
+            return await interaction.response.send_message("❌ Você não é o goleiro desta rodada!", ephemeral=True)
+        if self.choice_def is not None:
+            return await interaction.response.send_message("❌ Você já escolheu o lado do salto!", ephemeral=True)
+            
+        view = PenaltiEscolhaView(self, "def")
+        await interaction.response.send_message("🧤 Escolha para onde o seu goleiro vai pular:", view=view, ephemeral=True)
+
+    async def check_choices(self, interaction: discord.Interaction):
+        status_txt = ""
+        if self.choice_atk:
+            status_txt += f"✅ **{self.atk_player.display_name}** já preparou o chute.\n"
+        if self.choice_def:
+            status_txt += f"✅ **{self.def_player.display_name}** já preparou a defesa.\n"
+            
+        if self.choice_atk is None or self.choice_def is None:
+            embed = discord.Embed(
+                title=f"⚽ Pênaltis PvP — Rodada {self.rodada}/5",
+                description=f"{self.get_placar_status()}\n\n"
+                            f"**Cobrador:** {self.atk_player.mention}\n"
+                            f"**Goleiro:** {self.def_player.mention}\n\n"
+                            f"{status_txt}\n*Clique nos botões abaixo para definir sua jogada em segredo!*",
+                color=discord.Color.orange()
+            )
+            await self.message.edit(embed=embed)
+            return
+
+        is_gol = self.choice_atk != self.choice_def
+        
+        if self.atk_player.id == self.challenger.id:
+            self.chutes_challenger.append(is_gol)
+        else:
+            self.chutes_target.append(is_gol)
+            
+        if is_gol:
+            res_txt = f"⚽ **GOL!** **{self.atk_player.display_name}** chutou na **{self.choice_atk}** e superou **{self.def_player.display_name}** que pulou na **{self.choice_def}**!"
+        else:
+            res_txt = f"🧤 **DEFENDEU!** **{self.def_player.display_name}** saltou na **{self.choice_def}** e pegou o chute de **{self.atk_player.display_name}**!"
+            
+        self.choice_atk = None
+        self.choice_def = None
+        
+        if self.atk_player.id == self.challenger.id:
+            self.atk_player = self.target
+            self.def_player = self.challenger
+        else:
+            self.atk_player = self.challenger
+            self.def_player = self.target
+            
+        fim = False
+        vencedor = None
+        
+        rem_p1 = 5 - len(self.chutes_challenger)
+        rem_p2 = 5 - len(self.chutes_target)
+        gols_p1 = sum(self.chutes_challenger)
+        gols_p2 = sum(self.chutes_target)
+        
+        if gols_p1 > (gols_p2 + rem_p2):
+            fim = True
+            vencedor = self.challenger
+        elif gols_p2 > (gols_p1 + rem_p1):
+            fim = True
+            vencedor = self.target
+        elif len(self.chutes_challenger) >= 5 and len(self.chutes_target) >= 5:
+            if gols_p1 == gols_p2:
+                pass
+            else:
+                fim = True
+                vencedor = self.challenger if gols_p1 > gols_p2 else self.target
+                
+        if not fim and len(self.chutes_challenger) >= 5:
+            if len(self.chutes_challenger) == len(self.chutes_target):
+                if gols_p1 != gols_p2:
+                    fim = True
+                    vencedor = self.challenger if gols_p1 > gols_p2 else self.target
+                else:
+                    self.rodada += 1
+            else:
+                pass
+        elif not fim and self.atk_player.id == self.challenger.id:
+            self.rodada += 1
+            
+        if fim:
+            for child in self.children:
+                child.disabled = True
+                
+            perdedor = self.target if vencedor.id == self.challenger.id else self.challenger
+            
+            if self.wager > 0:
+                p_venc = await get_user_profile(vencedor)
+                p_perd = await get_user_profile(perdedor)
+                
+                p_venc["money"] += self.wager
+                p_perd["money"] -= self.wager
+                
+                await save_user_profile(vencedor.id, p_venc)
+                await save_user_profile(perdedor.id, p_perd)
+                
+                wager_txt = f"\n💰 **Aposta Resolvida:** **{vencedor.display_name}** recebeu **R$ {self.wager:,}** de **{perdedor.display_name}**!"
+            else:
+                wager_txt = ""
+                
+            embed = discord.Embed(
+                title="🏁 FIM DA DISPUTA DE PÊNALTIS PVP",
+                description=f"{res_txt}\n\n{self.get_placar_status()}\n\n🏆 **{vencedor.mention} é o CAMPEÃO da disputa!**{wager_txt}",
+                color=discord.Color.green()
+            )
+            await self.message.edit(embed=embed, view=self)
+        else:
+            embed = discord.Embed(
+                title=f"⚽ Pênaltis PvP — Rodada {self.rodada}/5",
+                description=f"{res_txt}\n\n{self.get_placar_status()}\n\n"
+                            f"**Cobrador:** {self.atk_player.mention}\n"
+                            f"**Goleiro:** {self.def_player.mention}\n\n"
+                            f"*Clique nos botões abaixo para definir sua jogada em segredo!*",
+                color=discord.Color.orange()
+            )
+            await self.message.edit(embed=embed, view=self)
+
+
+class PenaltiAceitarView(discord.ui.View):
+    def __init__(self, cog, challenger: discord.Member, target: discord.Member, wager: int):
+        super().__init__(timeout=60)
+        self.cog = cog
+        self.challenger = challenger
+        self.target = target
+        self.wager = wager
+
+    @discord.ui.button(label="Aceitar Desafio", style=discord.ButtonStyle.success, emoji="⚽")
+    @lock_user()
+    async def accept(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            return await interaction.response.send_message("❌ Apenas o desafiado pode aceitar o desafio.", ephemeral=True)
+            
+        await interaction.response.defer()
+        
+        if self.wager > 0:
+            p1 = await get_user_profile(self.challenger)
+            p2 = await get_user_profile(self.target)
+            
+            if p1.get("money", 0) < self.wager:
+                return await interaction.followup.send(f"❌ Desafio cancelado. O desafiante {self.challenger.mention} não possui mais o valor da aposta (R$ {self.wager:,}).", ephemeral=True)
+            if p2.get("money", 0) < self.wager:
+                return await interaction.followup.send(f"❌ Você não possui saldo de R$ {self.wager:,} para aceitar a aposta.", ephemeral=True)
+
+        for child in self.children:
+            child.disabled = True
+            
+        embed = discord.Embed(
+            title=f"⚽ Pênaltis PvP — Rodada 1/5",
+            description=f"👤 **{self.challenger.display_name}:** ⚪ ⚪ ⚪ ⚪ ⚪\n"
+                        f"👤 **{self.target.display_name}:** ⚪ ⚪ ⚪ ⚪ ⚪\n\n"
+                        f"**Cobrador:** {self.challenger.mention}\n"
+                        f"**Goleiro:** {self.target.mention}\n\n"
+                        f"*Clique nos botões abaixo para definir sua jogada em segredo!*",
+            color=discord.Color.orange()
+        )
+        
+        view = PenaltiPvPView(self.cog, self.challenger, self.target, self.wager)
+        view.message = await interaction.edit_original_response(content="🏁 **Disputa de Pênaltis Iniciada!**", embed=embed, view=view)
+
+    @discord.ui.button(label="Recusar", style=discord.ButtonStyle.danger, emoji="❌")
+    async def decline(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.target.id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        for child in self.children:
+            child.disabled = True
+        await interaction.response.edit_message(content=f"❌ {self.target.mention} recusou o desafio de pênaltis.", embed=None, view=self)
 
 
 async def setup(bot: commands.Bot):

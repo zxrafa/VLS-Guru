@@ -311,6 +311,8 @@ def run_match_simulation(
     p2_tactic: str,
     p1_chem: dict,
     p2_chem: dict,
+    p1_formation: str = "4-3-3",
+    p2_formation: str = "4-3-3",
 ) -> dict:
     """
     Executa a simulação completa de uma partida de 90 minutos.
@@ -700,4 +702,8 @@ def run_match_simulation(
         "narration":  narration_log,
         "performance": performance,
         "mvp":        mvp_name,
+        "p1_xi":      p1_xi,
+        "p2_xi":      p2_xi,
+        "p1_formation": p1_formation,
+        "p2_formation": p2_formation,
     }

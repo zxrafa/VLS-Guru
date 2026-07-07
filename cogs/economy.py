@@ -71,36 +71,39 @@ class EconomyCog(commands.Cog, name="Economia"):
         """
         Incrementa o progresso de missões do usuário com base em um critério específico.
         """
-        # Checa resets automático de semana/mês
         now = datetime.utcnow()
         current_week = now.strftime("%Y-%W")
         current_month = now.strftime("%Y-%m")
 
-        mp = profile.get("missions_progress")
-        if not mp:
-            mp = {"semanal": {}, "mensal": {}, "last_weekly_reset": "", "last_monthly_reset": ""}
-            profile["missions_progress"] = mp
+        mp = profile.setdefault("missions_progress", {"diario": {}, "semanal": {}, "mensal": {}, "last_weekly_reset": "", "last_monthly_reset": ""})
+        if "diario" not in mp:
+            mp["diario"] = {}
 
-        # Reset semanal (segunda-feira)
         if mp.get("last_weekly_reset") != current_week:
             mp["semanal"] = {}
             mp["last_weekly_reset"] = current_week
 
-        # Reset mensal (dia 1)
         if mp.get("last_monthly_reset") != current_month:
             mp["mensal"] = {}
             mp["last_monthly_reset"] = current_month
 
-        # Busca as missões ativas no banco de dados
+        # 1. Incrementa Missões Diárias (Salvas no perfil)
+        for dm in profile.get("daily_missions", []):
+            if dm.get("criterion") == criterion:
+                dm_id = dm["id"]
+                current_val = mp["diario"].get(dm_id, 0)
+                if isinstance(current_val, int):
+                    mp["diario"][dm_id] = current_val + amount
+
+        # 2. Incrementa Missões do Banco de Dados (semanais/mensais)
         missions = await get_missions()
         for m in missions:
             m_id = m["id"]
-            m_type = m["type"]  # semanal / mensal
+            m_type = m.get("type", "semanal")
             m_crit = m["criterion"]
             
             if m_crit == criterion:
-                # Se ainda não foi reivindicada/completada
-                current_val = mp[m_type].get(m_id, 0)
+                current_val = mp.setdefault(m_type, {}).get(m_id, 0)
                 if isinstance(current_val, int):
                     mp[m_type][m_id] = current_val + amount
 
@@ -290,6 +293,95 @@ class EconomyCog(commands.Cog, name="Economia"):
         )
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="roleta", description="Gira a roleta diária da sorte para ganhar prêmios incríveis!")
+    @lock_user()
+    async def roleta(self, interaction: discord.Interaction):
+        import time
+        import random
+        profile = await get_user_profile(interaction.user)
+        now = time.time()
+        
+        last_roleta = profile.get("last_roleta", 0)
+        extras = profile.get("roleta_extra", 0)
+        
+        usar_extra = False
+        if extras > 0:
+            usar_extra = True
+        elif now - last_roleta < 86400:
+            restante = 86400 - (now - last_roleta)
+            horas = int(restante // 3600)
+            minutos = int((restante % 3600) // 60)
+            return await interaction.response.send_message(
+                f"⏳ Você já girou a roleta hoje! Aguarde mais **{horas}h {minutos}m** ou consiga um Giro Extra.",
+                ephemeral=True
+            )
+            
+        await interaction.response.defer()
+        
+        msg = await interaction.followup.send("🎡 **Preparando a Roleta da Sorte...**")
+        await asyncio.sleep(1.0)
+        
+        itens_roleta = ["🎰", "🎰", "🎰"]
+        
+        await msg.edit(content=f"🎡 **Girando a Roleta...**\n\n[ {itens_roleta[0]} | {itens_roleta[1]} | {itens_roleta[2]} ]")
+        await asyncio.sleep(1.2)
+        
+        premios = ["comum", "incomum", "giro_extra", "raro", "lendario"]
+        pesos = [30, 29, 25, 15, 1]
+        ganhou = random.choices(premios, weights=pesos, k=1)[0]
+        
+        itens_roleta[0] = "💵" if ganhou in ["comum", "incomum"] else ("🌟" if ganhou == "giro_extra" else "💎")
+        await msg.edit(content=f"🎡 **Desacelerando...**\n\n[ {itens_roleta[0]} | 🎰 | 🎰 ]")
+        await asyncio.sleep(1.2)
+        
+        itens_roleta[1] = itens_roleta[0]
+        await msg.edit(content=f"🎡 **Quase parando...**\n\n[ {itens_roleta[0]} | {itens_roleta[1]} | 🎰 ]")
+        await asyncio.sleep(1.2)
+        
+        desc_premio = ""
+        color = discord.Color.light_grey()
+        if ganhou == "comum":
+            profile["money"] += 10_000
+            desc_premio = "💵 **Prêmio Comum:** R$ **10.000** adicionados à sua conta!"
+            itens_roleta[2] = "⚪"
+            color = discord.Color.light_grey()
+        elif ganhou == "incomum":
+            profile["money"] += 25_000
+            desc_premio = "💵 **Prêmio Incomum:** R$ **25.000** adicionados à sua conta!"
+            itens_roleta[2] = "🟢"
+            color = discord.Color.green()
+        elif ganhou == "giro_extra":
+            profile["roleta_extra"] = profile.get("roleta_extra", 0) + 1
+            desc_premio = "🌟 **Giro Extra:** Você ganhou mais 1 tentativa grátis para usar quando quiser!"
+            itens_roleta[2] = "🌟"
+            color = discord.Color.gold()
+        elif ganhou == "raro":
+            profile["premium_coins"] = profile.get("premium_coins", 0) + 10
+            desc_premio = f"💎 **Prêmio Raro:** **10 VLS Coins** ({VLS_COINS_EMOJI}) adicionadas à sua conta!"
+            itens_roleta[2] = "🔵"
+            color = discord.Color.blue()
+        elif ganhou == "lendario":
+            profile["premium_coins"] = profile.get("premium_coins", 0) + 50
+            desc_premio = f"👑 **PRÊMIO LENDÁRIO:** **50 VLS Coins** ({VLS_COINS_EMOJI}) adicionadas à sua conta!"
+            itens_roleta[2] = "👑"
+            color = discord.Color.purple()
+            
+        if usar_extra:
+            profile["roleta_extra"] -= 1
+        else:
+            profile["last_roleta"] = now
+            
+        await save_user_profile(interaction.user.id, profile)
+        
+        embed = discord.Embed(
+            title="🎡 Roleta da Sorte VLS",
+            description=f"**Resultado:**\n\n[ {itens_roleta[0]} | {itens_roleta[1]} | {itens_roleta[2]} ]\n\n{desc_premio}",
+            color=color
+        )
+        embed.set_footer(text=f"Giros extras restantes: {profile.get('roleta_extra', 0)}")
+        await msg.edit(content="🎉 **A roleta parou!**", embed=embed)
+
+
     @app_commands.command(name="recrutar", description="Envia olheiros para recrutar um jogador aleatório (cooldown 10 min).")
     async def recrutar(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -346,9 +438,23 @@ class EconomyCog(commands.Cog, name="Economia"):
         if scout_level > 0:
             embed.add_field(name="🔎 Bônus do Olheiro", value=f"Nível {scout_level} ativo (+{int(scout_level * 1.5)}% sorte)", inline=False)
 
+        # Animação de Revelação da Carta
+        msg = await interaction.followup.send("🔎 **Olheiros voltando de campo com notícias...**")
+        await asyncio.sleep(1.2)
+        
+        await msg.edit(content=f"🔎 **Olheiros encontraram um reforço!**\n\n⭐ Overall: **[ {obtido['over']} ]**")
+        await asyncio.sleep(1.2)
+        
+        await msg.edit(content=f"🔎 **Olheiros encontraram um reforço!**\n\n⭐ Overall: **[ {obtido['over']} ]**\n⚽ Posição: **[ {obtido.get('pos', '?')} ]**")
+        await asyncio.sleep(1.2)
+        
+        await msg.edit(content=f"🔎 **Olheiros encontraram um reforço!**\n\n⭐ Overall: **[ {obtido['over']} ]**\n⚽ Posição: **[ {obtido.get('pos', '?')} ]**\n🌌 Coleção: **[ {obtido.get('col_nome', 'Comum')} ]**")
+        await asyncio.sleep(1.2)
+
         # Exibe imagem da carta se disponível
         card_path = obtido.get("card", "")
-        view = ClaimView(interaction.user, obtido, preco)
+        view = ClaimView(interaction.user, obtido, preco, self)
+        
         if card_path:
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 try:
@@ -364,22 +470,23 @@ class EconomyCog(commands.Cog, name="Economia"):
                     if os.path.exists(local_cache_path):
                         file = discord.File(local_cache_path, filename="card.png")
                         embed.set_image(url="attachment://card.png")
-                        msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view, file=file)
+                        await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view, attachments=[file])
                     else:
                         embed.set_image(url=card_path)
-                        msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view)
+                        await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view)
                 except Exception as e:
                     print(f"Erro ao obter imagem no recrutar: {e}")
                     embed.set_image(url=card_path)
-                    msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view)
+                    await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view)
             elif __import__('os').path.exists(card_path):
                 file = discord.File(card_path, filename="card.png")
                 embed.set_image(url="attachment://card.png")
-                msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view, file=file)
+                await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view, attachments=[file])
             else:
-                msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view)
+                await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view)
         else:
-            msg = await interaction.followup.send("**O que você quer fazer com este jogador?**", embed=embed, view=view)
+            await msg.edit(content="**O que você quer fazer com este jogador?**", embed=embed, view=view)
+        
         view.message = msg
 
     @app_commands.command(name="transferir", description="Transfere fundos para outro membro (limite: R$ 100.000 por vez).")
@@ -456,71 +563,94 @@ class EconomyCog(commands.Cog, name="Economia"):
     @app_commands.command(name="missoes", description="Exibe suas missões ativas com progresso em tempo real.")
     async def missoes(self, interaction: discord.Interaction):
         profile = await get_user_profile(interaction.user)
-        missions = await get_missions()
-
-        if not missions:
-            return await interaction.response.send_message("📋 Não há nenhuma missão ativa no momento.", ephemeral=True)
-
-        # Reset automático de progresso semanal/mensal
+        
         now = datetime.utcnow()
+        current_day = now.strftime("%Y-%m-%d")
         current_week = now.strftime("%Y-%W")
         current_month = now.strftime("%Y-%m")
-        mp = profile.setdefault("missions_progress", {"semanal": {}, "mensal": {}, "last_weekly_reset": "", "last_monthly_reset": ""})
+        
+        DAILY_POOL = [
+            {"id": "meta_gols", "nome": "Goleador Nato — Marcar 30 gols", "criterion": "gols", "threshold": 30, "reward_type": "money", "reward_value": 50000, "type": "diario"},
+            {"id": "vitorias", "nome": "Espírito Vencedor — Vencer 15 partidas", "criterion": "vitorias", "threshold": 15, "reward_type": "money", "reward_value": 60000, "type": "diario"},
+            {"id": "clean_sheets", "nome": "Muralha Impenetrável — 10 clean sheets", "criterion": "clean_sheets", "threshold": 10, "reward_type": "money", "reward_value": 80000, "type": "diario"},
+            {"id": "recrutar", "nome": "Futebol de Base — Recrutar 15 jogadores", "criterion": "recrutar", "threshold": 15, "reward_type": "money", "reward_value": 40000, "type": "diario"},
+            {"id": "recrutar_80", "nome": "Olho Clínico — Recrutar um jogador 80+ OVR", "criterion": "recrutar_80", "threshold": 1, "reward_type": "coins", "reward_value": 15, "type": "diario"},
+            {"id": "treinos", "nome": "Foco no Preparo — Jogar 6 treinos", "criterion": "treinos", "threshold": 6, "reward_type": "money", "reward_value": 30000, "type": "diario"},
+            {"id": "desafios", "nome": "Desafiante Nato — Jogar 4 desafios/X1", "criterion": "desafios", "threshold": 4, "reward_type": "money", "reward_value": 25000, "type": "diario"},
+            {"id": "x1_apostado", "nome": "Quem Não Arrisca... — Jogar 1 X1 apostado", "criterion": "x1_apostado", "threshold": 1, "reward_type": "coins", "reward_value": 10, "type": "diario"},
+            {"id": "x1_apostado_500k", "nome": "Tudo ou Nada — Jogar X1 apostado acima de 500k", "criterion": "x1_apostado_500k", "threshold": 1, "reward_type": "coins", "reward_value": 25, "type": "diario"}
+        ]
+        
+        mp = profile.setdefault("missions_progress", {"diario": {}, "semanal": {}, "mensal": {}, "last_weekly_reset": "", "last_monthly_reset": ""})
+        if "diario" not in mp:
+            mp["diario"] = {}
+            
         changed = False
+        
+        if profile.get("last_mission_reset") != current_day or not profile.get("daily_missions"):
+            profile["daily_missions"] = random.sample(DAILY_POOL, 3)
+            mp["diario"] = {}
+            profile["last_mission_reset"] = current_day
+            changed = True
+            
         if mp.get("last_weekly_reset") != current_week:
             mp["semanal"] = {}
             mp["last_weekly_reset"] = current_week
             changed = True
+            
         if mp.get("last_monthly_reset") != current_month:
             mp["mensal"] = {}
             mp["last_monthly_reset"] = current_month
             changed = True
+            
         if changed:
             await save_user_profile(interaction.user.id, profile)
-
+            
+        db_missions = await get_missions() or []
+        combined_missions = profile.get("daily_missions", []) + db_missions
+        
+        if not combined_missions:
+            return await interaction.response.send_message("📋 Não há nenhuma missão ativa no momento.", ephemeral=True)
+            
         embed = discord.Embed(
             title="📋 Quadro de Missões",
             description="Selecione uma missão no menu abaixo para ver detalhes ou resgatar a recompensa.",
             color=discord.Color.blue()
         )
-
-        claimable = []
-        for m in missions:
+        
+        for m in combined_missions:
             m_id = m["id"]
             m_type = m.get("type", "semanal")
             m_nome = m.get("nome", m_id.replace("_", " ").title())
             m_threshold = m["threshold"]
             m_crit = m.get("criterion", "?")
-            progress_val = mp.get(m_type, {}).get(m_id, 0)
-
+            progress_val = mp.setdefault(m_type, {}).get(m_id, 0)
+            
             if progress_val == "claimed":
                 status_icon = "✅"
                 prog_str = "Reivindicada"
             elif isinstance(progress_val, int) and progress_val >= m_threshold:
                 status_icon = "⭐"
                 prog_str = f"{m_threshold}/{m_threshold}"
-                claimable.append(m)
             else:
                 status_icon = "⏳"
                 val = progress_val if isinstance(progress_val, int) else 0
                 prog_str = f"{val}/{m_threshold}"
-
+                
             rew_label = ""
             if m.get("reward_type") == "money":
                 rew_label = f"R$ {m.get('reward_value', 0):,}"
             elif m.get("reward_type") == "coins":
-                rew_label = f"{m.get('reward_value', 0)} 💸 Coins"
-            elif m.get("reward_type") == "player":
-                rew_label = f"Carta: `{m.get('reward_player_id','?')}`"
-
-            tipo_badge = "📅" if m_type == "semanal" else "📆"
+                rew_label = f"{m.get('reward_value', 0)} {VLS_COINS_EMOJI}"
+                
+            tipo_badge = "☀️" if m_type == "diario" else ("📅" if m_type == "semanal" else "📆")
             embed.add_field(
                 name=f"{status_icon} {tipo_badge} {m_nome}",
                 value=f"`{prog_str}` {m_crit.capitalize()} • 🏆 {rew_label}",
                 inline=False
             )
-
-        view = MissoesView(interaction.user.id, missions, mp, profile)
+            
+        view = MissoesView(interaction.user.id, combined_missions, mp, profile)
         await interaction.response.send_message(embed=embed, view=view)
 
 
@@ -860,7 +990,33 @@ class LojaView(discord.ui.View):
             profile["inventory"].append(player)
             drawn_players.append((chosen_rarity, player))
 
+        # Incrementa missões de recrutamento
+        await self.increment_mission(interaction.user.id, profile, "recrutar", num_cards)
+        for rarity, p in drawn_players:
+            if p.get("over", 0) >= 80:
+                await self.increment_mission(interaction.user.id, profile, "recrutar_80", 1)
+
         await save_user_profile(interaction.user.id, profile)
+
+        msg = await interaction.followup.send("⏳ **Processando compra do pacote...**")
+        await asyncio.sleep(1.0)
+        
+        # Revelação animada de cada carta
+        for idx, (rarity, p) in enumerate(drawn_players, 1):
+            base_content = f"📦 **Abrindo Pacote {pack_name} (Carta {idx}/{num_cards}):**\n\n"
+            
+            await msg.edit(content=base_content + f"⭐ Overall: **[ {p['over']} ]**")
+            await asyncio.sleep(1.2)
+            
+            await msg.edit(content=base_content + f"⭐ Overall: **[ {p['over']} ]**\n⚽ Posição: **[ {p.get('pos', '?')} ]**")
+            await asyncio.sleep(1.2)
+            
+            await msg.edit(content=base_content + f"⭐ Overall: **[ {p['over']} ]**\n⚽ Posição: **[ {p.get('pos', '?')} ]**\n🌌 Coleção: **[ {p.get('col_nome', 'Comum')} ]**")
+            await asyncio.sleep(1.2)
+            
+            emoji = rarity_emojis.get(rarity, "⚪")
+            await msg.edit(content=base_content + f"🎉 **{emoji} {p['name']}!**\n⭐ Overall: `{p['over']}` | ⚽ Posição: `{p.get('pos', '?')}` | 🌌 Coleção: `{p.get('col_nome', 'Comum')}`")
+            await asyncio.sleep(1.5)
 
         embed = discord.Embed(title=f"📦 Pacote {pack_name} Aberto!", color=discord.Color.gold())
         desc = ""
@@ -874,11 +1030,11 @@ class LojaView(discord.ui.View):
 
         embed.description = desc
         embed.set_footer(text=f"VLS Coins restantes: {profile['premium_coins']} Coins")
-        await interaction.followup.send(embed=embed)
+        await msg.edit(content="✅ **Abertura concluída!**", embed=embed)
 
 
 class ClaimView(discord.ui.View):
-    def __init__(self, user, player, preco):
+    def __init__(self, user, player, preco, cog):
         super().__init__(timeout=60)
         self.user = user
         self.player = player
@@ -886,6 +1042,7 @@ class ClaimView(discord.ui.View):
         self.processed = False
         self.confirming_sale = False
         self.message = None
+        self.cog = cog
 
     async def on_timeout(self):
         if not self.processed:
@@ -895,6 +1052,12 @@ class ClaimView(discord.ui.View):
                 player_copy = self.player.copy()
                 player_copy["instance_id"] = str(uuid.uuid4())[:8]
                 profile["inventory"].append(player_copy)
+                
+                # Incrementa missões
+                await self.cog.increment_mission(self.user.id, profile, "recrutar", 1)
+                if player_copy.get("over", 0) >= 80:
+                    await self.cog.increment_mission(self.user.id, profile, "recrutar_80", 1)
+
                 await save_user_profile(self.user.id, profile)
                 if self.message:
                     col_icon = self.player.get("col_emoji", "✨")
@@ -921,6 +1084,12 @@ class ClaimView(discord.ui.View):
         player_copy["instance_id"] = str(uuid.uuid4())[:8]
         player_copy["xp"] = 0
         profile["inventory"].append(player_copy)
+        
+        # Incrementa missões
+        await self.cog.increment_mission(interaction.user.id, profile, "recrutar", 1)
+        if player_copy.get("over", 0) >= 80:
+            await self.cog.increment_mission(interaction.user.id, profile, "recrutar_80", 1)
+
         await save_user_profile(interaction.user.id, profile)
 
         col_icon = self.player.get("col_emoji", "✨")
@@ -1021,13 +1190,14 @@ class MissoesView(discord.ui.View):
 
         fresh_profile = await get_user_profile(interaction.user)
         fresh_mp = fresh_profile.get("missions_progress", {})
-        missions = await get_missions()
+        db_missions = await get_missions() or []
+        combined = fresh_profile.get("daily_missions", []) + db_missions
         claimed_names = []
 
-        for m in missions:
+        for m in combined:
             m_id = m["id"]
             m_type = m.get("type", "semanal")
-            progress_val = fresh_mp.get(m_type, {}).get(m_id, 0)
+            progress_val = fresh_mp.setdefault(m_type, {}).get(m_id, 0)
             if not (isinstance(progress_val, int) and progress_val >= m["threshold"]):
                 continue
 
@@ -1047,7 +1217,7 @@ class MissoesView(discord.ui.View):
                     inst.update({"goals":0,"assists":0,"saves":0,"matches":0,"mvps":0,"yellow_cards":0,"red_cards":0,"xp":0})
                     fresh_profile.setdefault("inventory", []).append(inst)
 
-            fresh_mp.setdefault(m_type, {})[m_id] = "claimed"
+            fresh_mp[m_type][m_id] = "claimed"
             nome = m.get("nome", m_id.replace("_"," ").title())
             claimed_names.append(nome)
 
@@ -1085,7 +1255,7 @@ class MissaoDetailDropdown(discord.ui.Select):
         m_nome = m.get("nome", m_id.replace("_", " ").title())
         m_crit = m.get("criterion", "?")
         m_threshold = m.get("threshold", 1)
-        progress_val = self.mp.get(m_type, {}).get(m_id, 0)
+        progress_val = self.mp.setdefault(m_type, {}).get(m_id, 0)
 
         if progress_val == "claimed":
             status = "✅ Já reivindicada"
@@ -1106,7 +1276,7 @@ class MissaoDetailDropdown(discord.ui.Select):
         elif m.get("reward_type") == "player":
             rew_label = f"Carta: `{m.get('reward_player_id','?')}`"
 
-        tipo_badge = "📅 Semanal" if m_type == "semanal" else "📆 Mensal"
+        tipo_badge = "☀️ Diário" if m_type == "diario" else ("📅 Semanal" if m_type == "semanal" else "📆 Mensal")
 
         embed = discord.Embed(
             title=f"📌 {m_nome}",

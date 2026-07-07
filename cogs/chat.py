@@ -92,8 +92,11 @@ class ChatCog(commands.Cog, name="Chat"):
                                 await self.save_feedback(message.author, content)
 
                             await message.reply(reply_text)
+                else:
+                    err_txt = await resp.text()
+                    print(f"Erro Gemini API (Status {resp.status}): {err_txt}")
         except Exception as e:
-            print(f"Erro na API do Gemini: {e}")
+            print(f"Erro ao chamar API do Gemini: {e}")
 
     async def save_feedback(self, author: discord.User, content: str):
         try:

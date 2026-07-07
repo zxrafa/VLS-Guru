@@ -63,8 +63,16 @@ def load_card_image(card_source: str) -> Image.Image:
             
     return None
 
-# Carregamento de fonte com fallbacks para Windows
+# Carregamento de fonte com fallbacks para Windows e Linux (renogare.otf)
 def get_font(size, bold=True):
+    # Tenta usar a fonte oficial da liga (renogare.otf) primeiro
+    local_font = "renogare.otf"
+    if os.path.exists(local_font):
+        try:
+            return ImageFont.truetype(local_font, size)
+        except Exception:
+            pass
+
     font_names = [
         "C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf",
         "C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf",

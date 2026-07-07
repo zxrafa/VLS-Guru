@@ -53,10 +53,13 @@ WEB_SESSIONS: dict = {}
 # HELPERS DE SESSÃO WEB
 # ==============================================================================
 
-def get_session(request: web.Request) -> dict | None:
+async def get_session(request: web.Request) -> dict | None:
     cookie = request.cookies.get("session_id")
-    if cookie and cookie in WEB_SESSIONS:
-        return WEB_SESSIONS[cookie]
+    if not cookie:
+        return None
+    record = await db_get(f"session_{cookie}")
+    if record:
+        return record["data"]
     return None
 
 
@@ -64,21 +67,14 @@ def login_required(func):
     """Decorator que bloqueia rotas da API caso o usuário não esteja autenticado como admin."""
     @functools.wraps(func)
     async def wrapper(request: web.Request, *args, **kwargs):
-        # 1. Verifica token estático para simplificar login administrativo do painel
-        auth_header = request.headers.get("Authorization")
-        if auth_header == "Bearer VirtuaLS" or auth_header == "VirtuaLS":
-            return await func(request, *args, **kwargs)
-
-        # 2. Fallback para sessão do Discord
-        session = get_session(request)
-        if session and session.get("is_admin"):
-            request["session"] = session
-            return await func(request, *args, **kwargs)
-
-        return web.json_response(
-            {"error": "Acesso negado. Autenticação de administrador obrigatória."},
-            status=401,
-        )
+        session = await get_session(request)
+        if not session or not session.get("is_admin"):
+            return web.json_response(
+                {"error": "Acesso negado. Autenticação de administrador obrigatória."},
+                status=401,
+            )
+        request["session"] = session
+        return await func(request, *args, **kwargs)
     return wrapper
 
 
@@ -185,7 +181,8 @@ async def handle_callback(request: web.Request) -> web.Response:
         )
 
     session_token = str(uuid.uuid4())
-    WEB_SESSIONS[session_token] = {"user": user_data, "user_id": user_id, "is_admin": True}
+    session_data = {"user": user_data, "user_id": user_id, "is_admin": True}
+    await db_upsert(f"session_{session_token}", session_data)
 
     is_secure = (
         request.headers.get("X-Forwarded-Proto", "http") == "https"
@@ -197,19 +194,7 @@ async def handle_callback(request: web.Request) -> web.Response:
 
 
 async def api_auth_status(request: web.Request) -> web.Response:
-    auth_header = request.headers.get("Authorization")
-    if auth_header == "Bearer VirtuaLS" or auth_header == "VirtuaLS":
-        return web.json_response({
-            "logged_in": True,
-            "is_admin": True,
-            "user": {
-                "username": "Admin VLS",
-                "global_name": "Administrador da Liga",
-                "avatar_url": "https://i.ibb.co/bMHVPgbd/54d7bc1101119ff3a1643b475250cd0b.webp"
-            }
-        })
-
-    session = get_session(request)
+    session = await get_session(request)
     if session:
         return web.json_response({"logged_in": True, "is_admin": session["is_admin"], "user": session["user"]})
     return web.json_response({"logged_in": False})
@@ -217,8 +202,8 @@ async def api_auth_status(request: web.Request) -> web.Response:
 
 async def api_auth_logout(request: web.Request) -> web.Response:
     cookie = request.cookies.get("session_id")
-    if cookie and cookie in WEB_SESSIONS:
-        del WEB_SESSIONS[cookie]
+    if cookie:
+        await db_delete(f"session_{cookie}")
     is_secure = (
         request.headers.get("X-Forwarded-Proto", "http") == "https"
         or request.url.scheme == "https"

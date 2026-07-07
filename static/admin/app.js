@@ -1,15 +1,3 @@
-// Interceptador global do fetch para injetar a senha de autenticação
-const originalFetch = window.fetch;
-window.fetch = function(url, options) {
-    options = options || {};
-    options.headers = options.headers || {};
-    const adminToken = localStorage.getItem("admin_token");
-    if (adminToken) {
-        options.headers["Authorization"] = "Bearer " + adminToken;
-    }
-    return originalFetch(url, options);
-};
-
 // ==========================================
 // CONFIGURAÇÕES E ESTADO GLOBAL DO APP
 // ==========================================
@@ -28,47 +16,35 @@ document.addEventListener("DOMContentLoaded", async () => {
     initFormHandlers();
     initModalControls();
     
-    // Configura botão de submissão de senha
-    const btnSubmit = document.getElementById("btn-submit-password");
-    const inputPass = document.getElementById("admin-password-input");
+    // Configura botão de submissão do PIN
+    const btnSubmitPin = document.getElementById("btn-submit-pin");
+    const inputPin = document.getElementById("admin-pin-input");
     const errPanel = document.getElementById("login-error-msg");
 
-    const handleLoginSubmit = async () => {
-        const pass = inputPass.value.trim();
-        if (!pass) return;
-
-        // Testa a senha fazendo fetch no status
-        errPanel.style.display = "none";
-        try {
-            const res = await originalFetch("/api/auth/status", {
-                headers: { "Authorization": "Bearer " + pass }
-            });
-            if (res.status === 200) {
-                const data = await res.json();
-                if (data.logged_in && data.is_admin) {
-                    localStorage.setItem("admin_token", pass);
-                    currentUser = data.user;
-                    showAppScreen();
-                    loadInitialData();
-                    showToast("Acesso concedido!", "success");
-                } else {
-                    errPanel.style.display = "block";
-                }
-            } else {
-                errPanel.style.display = "block";
-            }
-        } catch (err) {
-            console.error(err);
+    const handlePinSubmit = () => {
+        const pin = inputPin.value.trim();
+        if (pin === "8888") {
+            localStorage.setItem("admin_pin", "8888");
+            errPanel.style.display = "none";
+            showAppScreen();
+            loadInitialData();
+            showToast("Painel desbloqueado com sucesso!", "success");
+        } else {
             errPanel.style.display = "block";
+            inputPin.value = "";
         }
     };
 
-    btnSubmit.addEventListener("click", handleLoginSubmit);
-    inputPass.addEventListener("keypress", (e) => {
-        if (e.key === "Enter") {
-            handleLoginSubmit();
-        }
-    });
+    if (btnSubmitPin) {
+        btnSubmitPin.addEventListener("click", handlePinSubmit);
+    }
+    if (inputPin) {
+        inputPin.addEventListener("keypress", (e) => {
+            if (e.key === "Enter") {
+                handlePinSubmit();
+            }
+        });
+    }
 
     // Checa status de login
     await checkAuthStatus();
@@ -81,23 +57,45 @@ async function checkAuthStatus() {
             const data = await res.json();
             if (data.logged_in && data.is_admin) {
                 currentUser = data.user;
-                showAppScreen();
-                loadInitialData();
+                
+                // Se o usuário está logado via Discord, verifica o PIN local
+                const savedPin = localStorage.getItem("admin_pin");
+                if (savedPin === "8888") {
+                    showAppScreen();
+                    loadInitialData();
+                } else {
+                    // Logado no Discord, mas precisa digitar o PIN
+                    showPinScreen(currentUser.global_name || currentUser.username);
+                }
             } else {
-                showLoginScreen();
+                showDiscordLoginScreen();
             }
         } else {
-            showLoginScreen();
+            showDiscordLoginScreen();
         }
     } catch (err) {
         console.error("Erro ao verificar autenticação:", err);
-        showLoginScreen();
+        showDiscordLoginScreen();
     }
 }
 
-function showLoginScreen() {
+function showDiscordLoginScreen() {
     document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("login-step-discord").style.display = "flex";
+    document.getElementById("login-step-pin").style.display = "none";
     document.getElementById("app-screen").style.display = "none";
+}
+
+function showPinScreen(adminName) {
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("login-step-discord").style.display = "none";
+    document.getElementById("login-step-pin").style.display = "flex";
+    document.getElementById("app-screen").style.display = "none";
+    
+    const welcomeMsg = document.getElementById("pin-welcome-msg");
+    if (welcomeMsg) {
+        welcomeMsg.innerHTML = `Olá, <strong>${adminName}</strong>! Insira o PIN de segurança para abrir o painel.`;
+    }
 }
 
 function showAppScreen() {
@@ -126,10 +124,10 @@ function initTabNavigation() {
 
     // Logout
     document.getElementById("btn-logout").addEventListener("click", async () => {
-        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_pin");
         await fetch("/api/auth/logout");
         showToast("Sessão encerrada com sucesso.", "info");
-        showLoginScreen();
+        showDiscordLoginScreen();
     });
 }
 

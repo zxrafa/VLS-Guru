@@ -26,14 +26,26 @@
                 <h1>PAINEL ADM</h1>
                 <p>Liga VLS</p>
             </div>
-            <p class="login-description">Insira a senha de acesso administrativo para abrir o painel da liga.</p>
-            <div class="login-form-group" style="width: 100%; display: flex; flex-direction: column; gap: 0.8rem;">
-                <input type="password" id="admin-password-input" placeholder="Senha do Administrador" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; padding: 0.75rem 1rem; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; text-align: center; width: 100%;">
-                <button id="btn-submit-password" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-pink), var(--color-cyan)); border: none; font-weight: 700; width: 100%; justify-content: center;">
-                    Entrar <i class="fa-solid fa-right-to-bracket" style="margin-left: 0.5rem;"></i>
-                </button>
+            
+            <!-- Etapa 1: Autenticação via Discord -->
+            <div id="login-step-discord" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                <p class="login-description">Faça login com sua conta do Discord para gerenciar a liga.</p>
+                <a href="/login" class="btn btn-discord" style="background: #5865F2; color: #fff; font-weight: 700; width: 100%; justify-content: center; border: none; margin-top: 0.5rem;">
+                    <i class="fa-brands fa-discord"></i> Entrar com o Discord
+                </a>
             </div>
-            <p id="login-error-msg" style="color: var(--color-red); font-size: 0.85rem; margin-top: 0.8rem; display: none; font-weight: 500;">Senha incorreta! Tente novamente.</p>
+
+            <!-- Etapa 2: Confirmação do PIN -->
+            <div id="login-step-pin" style="width: 100%; display: none; flex-direction: column; align-items: center;">
+                <p class="login-description" id="pin-welcome-msg">Insira o PIN de segurança para abrir o painel.</p>
+                <div class="login-form-group" style="width: 100%; display: flex; flex-direction: column; gap: 0.8rem;">
+                    <input type="password" id="admin-pin-input" placeholder="PIN de 4 dígitos" maxlength="4" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; padding: 0.75rem 1rem; border-radius: 8px; font-family: inherit; font-size: 1.2rem; outline: none; text-align: center; width: 100%; font-weight: 700; letter-spacing: 0.5rem;">
+                    <button id="btn-submit-pin" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-pink), var(--color-cyan)); border: none; font-weight: 700; width: 100%; justify-content: center;">
+                        Confirmar PIN <i class="fa-solid fa-key" style="margin-left: 0.5rem;"></i>
+                    </button>
+                </div>
+                <p id="login-error-msg" style="color: var(--color-red); font-size: 0.85rem; margin-top: 0.8rem; display: none; font-weight: 500;">PIN incorreto! Tente novamente.</p>
+            </div>
         </div>
     </div>
 

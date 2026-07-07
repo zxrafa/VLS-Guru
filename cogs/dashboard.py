@@ -229,15 +229,20 @@ class JogadoresView(discord.ui.View):
         if interaction.user.id != self.owner_id:
             return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
         await interaction.response.send_message(
-            "📝 **Como importar jogadores em massa:**\n"
-            "Use o comando de barra: **`/importar_txt`** anexando o arquivo `.txt` contendo os jogadores.\n\n"
-            "**Formato de cada linha do arquivo TXT:**\n"
-            "`Nome | Overall | Posição | ID_Coleção | Nacionalidade | Clube | Link_Foto (Opcional)`\n\n"
-            "**Exemplo:**\n"
+            "📝 **Importação em Massa via `/importar_txt`**\n"
+            "Envie o comando `/importar_txt` no chat e anexe um arquivo `.txt` contendo os jogadores.\n\n"
+            "O arquivo suporta **dois modos** de preenchimento:\n\n"
+            "📊 **1. MODO SIMPLIFICADO (6 a 7 campos):**\n"
+            "`Nome | Overall | Posição | ID_Coleção | Nacionalidade | Clube | [Foto opcional]`\n"
+            "*Os atributos técnicos secundários serão calculados de forma automática com base no Overall.*\n"
             "```text\n"
             "Lionel Messi | 91 | ST | base | Argentino | Inter Miami\n"
-            "Cristiano Ronaldo | 88 | ST | base | Portugues | Al-Nassr\n"
-            "Alisson | 89 | GK | base | Brasileiro | Liverpool | https://i.ibb.co/foto.png\n"
+            "```\n"
+            "🔥 **2. MODO COMPLETO (14 a 16 campos):**\n"
+            "`Nome | Overall | Posição | ID_Coleção | Nacionalidade | Clube | Atributo1 | Atributo2 | Atributo3 | Atributo4 | Atributo5 | Atributo6 | PernaRuim | Fintas | [PlayStyles] | [Foto]`\n"
+            "*Para jogadores Normais, os Atributos 1 a 6 são: PAC | SHO | PAS | DRI | DEF | PHY. Para Goleiros (GK) são: DIV | HAN | KIC | REF | SPD | POS. PlayStyles devem ser separados por vírgula (ex: trivela,rapid).*\n"
+            "```text\n"
+            "Cristiano Ronaldo | 88 | ST | base | Portugues | Al-Nassr | 80 | 88 | 78 | 80 | 35 | 78 | 4 | 5 | trivela,malvadeza | https://link.com/cr7.png\n"
             "```",
             ephemeral=True
         )

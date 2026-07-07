@@ -115,7 +115,7 @@ class AdminCog(commands.Cog, name="Admin"):
                 
             partes = [p.strip() for p in linha_strip.split("|")]
             if len(partes) < 6:
-                erros.append(f"Linha {idx}: Formato incompleto. Deve ter: 'Nome | Overall | Posição | Coleção | Nacionalidade | Clube'")
+                erros.append(f"Linha {idx}: Formato incompleto. Deve ter pelo menos 6 campos (Simplificado) ou 14 campos (Completo)")
                 continue
                 
             nome = partes[0]
@@ -149,10 +149,64 @@ class AdminCog(commands.Cog, name="Admin"):
             nacionalidade = partes[4]
             clube = partes[5]
             
+            is_gk = posicao == "GK"
+            is_completo = len(partes) >= 14
+            
+            # Inicializa variáveis padrão
+            attr1, attr2, attr3, attr4, attr5, attr6 = 75, 75, 75, 75, 75, 75
+            weak_foot = 3
+            skill_moves = 3
+            playstyles = []
             card_url = ""
-            if len(partes) >= 7 and partes[6].startswith("http"):
-                card_url = partes[6]
-                
+            
+            if is_completo:
+                try:
+                    attr1 = int(partes[6])
+                    attr2 = int(partes[7])
+                    attr3 = int(partes[8])
+                    attr4 = int(partes[9])
+                    attr5 = int(partes[10])
+                    attr6 = int(partes[11])
+                    weak_foot = int(partes[12])
+                    skill_moves = int(partes[13])
+                    
+                    if not (0 <= attr1 <= 99) or not (0 <= attr2 <= 99) or not (0 <= attr3 <= 99) or not (0 <= attr4 <= 99) or not (0 <= attr5 <= 99) or not (0 <= attr6 <= 99):
+                        erros.append(f"Linha {idx} ({nome}): Atributos devem ser de 0 a 99.")
+                        continue
+                    if not (1 <= weak_foot <= 5) or not (1 <= skill_moves <= 5):
+                        erros.append(f"Linha {idx} ({nome}): Perna Ruim e Fintas devem ser entre 1 e 5.")
+                        continue
+                except (ValueError, IndexError):
+                    erros.append(f"Linha {idx} ({nome}): Erro na formatação dos atributos numéricos do Modo Completo.")
+                    continue
+                    
+                # Playstyles (campo 14)
+                if len(partes) >= 15 and partes[14]:
+                    playstyles = [ps.strip().lower() for ps in partes[14].split(",") if ps.strip()]
+                    
+                # Foto (campo 15)
+                if len(partes) >= 16 and partes[15].startswith("http"):
+                    card_url = partes[15]
+            else:
+                # Modo simplificado
+                if len(partes) >= 7 and partes[6].startswith("http"):
+                    card_url = partes[6]
+                    
+                if is_gk:
+                    attr1 = overall - 2 if overall > 2 else 1 # div
+                    attr2 = overall - 3 if overall > 3 else 1 # han
+                    attr3 = overall - 5 if overall > 5 else 1 # kic
+                    attr4 = overall # ref
+                    attr5 = overall - 10 if overall > 10 else 1 # spd
+                    attr6 = overall - 1 if overall > 1 else 1 # pos_stat
+                else:
+                    attr1 = overall - 2 if overall > 2 else 1 # pac
+                    attr2 = overall - 4 if overall > 4 else 1 # sho
+                    attr3 = overall - 3 if overall > 3 else 1 # pas
+                    attr4 = overall - 1 if overall > 1 else 1 # dri
+                    attr5 = overall - 15 if overall > 15 else 1 # def
+                    attr6 = overall - 5 if overall > 5 else 1 # phy
+            
             # Gera slug do ID
             nome_normalizado = unicodedata.normalize('NFKD', nome).encode('ASCII', 'ignore').decode('ASCII')
             nome_normalizado = nome_normalizado.lower()
@@ -174,7 +228,6 @@ class AdminCog(commands.Cog, name="Admin"):
                 final_id = f"{slug_id}_{suffix}"
                 suffix += 1
                 
-            is_gk = posicao == "GK"
             player_data = {
                 "id": final_id,
                 "name": nome,
@@ -186,40 +239,40 @@ class AdminCog(commands.Cog, name="Admin"):
                 "max_playstyles": col_record["data"].get("max_playstyles", 0),
                 "card": card_url,
                 "xp": 0,
-                "weak_foot": 3,
-                "skill_moves": 3,
+                "weak_foot": weak_foot,
+                "skill_moves": skill_moves,
                 "nationality": nacionalidade,
                 "club": clube,
-                "playstyles": []
+                "playstyles": playstyles
             }
             
             if is_gk:
                 player_data.update({
-                    "div": overall - 2 if overall > 2 else 1,
-                    "han": overall - 3 if overall > 3 else 1,
-                    "kic": overall - 5 if overall > 5 else 1,
-                    "ref": overall,
-                    "spd": overall - 10 if overall > 10 else 1,
-                    "pos_stat": overall - 1 if overall > 1 else 1,
-                    "shoot": overall - 5 if overall > 5 else 1,
-                    "pass_stat": overall - 3 if overall > 3 else 1,
-                    "dribble": overall,
-                    "defense": overall - 2 if overall > 2 else 1,
-                    "physical": overall - 1 if overall > 1 else 1
+                    "div": attr1,
+                    "han": attr2,
+                    "kic": attr3,
+                    "ref": attr4,
+                    "spd": attr5,
+                    "pos_stat": attr6,
+                    "shoot": attr3,
+                    "pass_stat": attr2,
+                    "dribble": attr4,
+                    "defense": attr1,
+                    "physical": attr6
                 })
             else:
                 player_data.update({
-                    "pac": overall - 2 if overall > 2 else 1,
-                    "sho": overall - 4 if overall > 4 else 1,
-                    "pas": overall - 3 if overall > 3 else 1,
-                    "dri": overall - 1 if overall > 1 else 1,
-                    "def": overall - 15 if overall > 15 else 1,
-                    "phy": overall - 5 if overall > 5 else 1,
-                    "shoot": overall - 4 if overall > 4 else 1,
-                    "pass_stat": overall - 3 if overall > 3 else 1,
-                    "dribble": overall - 1 if overall > 1 else 1,
-                    "defense": overall - 15 if overall > 15 else 1,
-                    "physical": overall - 5 if overall > 5 else 1
+                    "pac": attr1,
+                    "sho": attr2,
+                    "pas": attr3,
+                    "dri": attr4,
+                    "def": attr5,
+                    "phy": attr6,
+                    "shoot": attr2,
+                    "pass_stat": attr3,
+                    "dribble": attr4,
+                    "defense": attr5,
+                    "physical": attr6
                 })
                 
             await db_upsert(f"player_{final_id}", player_data)

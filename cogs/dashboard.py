@@ -280,8 +280,19 @@ class CriarJogadorModal1(VLSModal, title="Criar Jogador — Etapa 1/3: Dados Bá
         if not slug_id:
             return await interaction.response.send_message("❌ Nome inválido para geração de ID do jogador.", ephemeral=True)
 
+        # Verifica se o ID já existe e adiciona um sufixo numérico (_2, _3...) se necessário
+        final_id = slug_id
+        suffix = 2
+        while True:
+            doc_id = f"player_{final_id}"
+            existing = await db_get(doc_id)
+            if not existing:
+                break
+            final_id = f"{slug_id}_{suffix}"
+            suffix += 1
+
         _PENDING_PLAYER[interaction.user.id] = {
-            "id": slug_id,
+            "id": final_id,
             "name": nome_original,
             "over": overall,
             "pos": pos_upper,

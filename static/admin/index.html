@@ -371,11 +371,15 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label for="match-home">Time de Casa</label>
-                        <input type="text" id="match-home" required placeholder="Ex: VLS FC">
+                        <select id="match-home" required style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; width: 100%; font-family: inherit; outline: none;">
+                            <option value="">Selecione o time...</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="match-away">Time de Fora</label>
-                        <input type="text" id="match-away" required placeholder="Ex: Real Madrid">
+                        <select id="match-away" required style="background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; width: 100%; font-family: inherit; outline: none;">
+                            <option value="">Selecione o time...</option>
+                        </select>
                     </div>
                 </div>
 
@@ -449,6 +453,33 @@
                     <button type="submit" class="btn btn-primary">Publicar Notícia</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Gerenciar Times do Campeonato -->
+    <div id="modal-teams" class="modal">
+        <div class="modal-content glass animate-slide-down" style="max-width: 500px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-glass); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                <h3 id="modal-teams-title">Times do Campeonato</h3>
+                <button class="modal-close" id="btn-close-teams-modal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <!-- Formulário Simples para Adicionar Time -->
+            <form id="form-add-time" style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border-glass); padding-bottom: 1.25rem;">
+                <input type="hidden" id="teams-camp-id">
+                <input type="text" id="new-team-name" required placeholder="Nome do Time (Ex: Real Madrid)" style="flex: 1; background: rgba(255,255,255,0.05); color: var(--text-primary); border: 1px solid var(--border-card); padding: 0.5rem 1rem; border-radius: 8px; font-family: inherit; outline: none;">
+                <button type="submit" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-pink), var(--color-cyan)); border: none; font-weight: 700; padding: 0.5rem 1.25rem;">
+                    <i class="fa-solid fa-plus"></i> Adicionar
+                </button>
+            </form>
+
+            <!-- Lista de Times -->
+            <div style="max-height: 250px; overflow-y: auto; padding-right: 0.25rem;">
+                <ul id="teams-list" style="list-style: none; display: flex; flex-direction: column; gap: 0.50rem; padding: 0;">
+                    <!-- Injetado dinamicamente -->
+                    <li style="color: var(--text-muted); text-align: center; padding: 1rem 0;">Carregando times...</li>
+                </ul>
+            </div>
         </div>
     </div>
 

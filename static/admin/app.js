@@ -210,6 +210,7 @@ function initModalControls() {
     document.getElementById("btn-close-match-modal").addEventListener("click", () => closeModal("modal-match"));
     document.getElementById("btn-close-news-modal").addEventListener("click", () => closeModal("modal-news"));
     document.getElementById("btn-close-league-player-modal").addEventListener("click", () => closeModal("modal-league-player"));
+    document.getElementById("btn-close-teams-modal").addEventListener("click", () => closeModal("modal-teams"));
     
     document.getElementById("btn-cancel-championship").addEventListener("click", () => closeModal("modal-championship"));
     document.getElementById("btn-cancel-match").addEventListener("click", () => closeModal("modal-match"));
@@ -223,6 +224,12 @@ function initModalControls() {
 
     document.getElementById("filter-match-championship").addEventListener("change", () => loadMatches());
     document.getElementById("filter-league-player-championship").addEventListener("change", () => loadLeaguePlayers());
+
+    // Escuta a mudança de campeonato na criação do jogo para preencher os times
+    document.getElementById("match-championship").addEventListener("change", (e) => {
+        const campId = e.target.value;
+        updateMatchTeamsSelects(campId);
+    });
 }
 
 function openModal(modalId) {
@@ -373,6 +380,30 @@ function initFormHandlers() {
             showToast("Erro ao publicar notícia.", "error");
         }
     });
+
+    // Form Adicionar Time no Campeonato
+    document.getElementById("form-add-time").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const campId = document.getElementById("teams-camp-id").value;
+        const nome = document.getElementById("new-team-name").value.trim();
+        if (!nome || !campId) return;
+
+        const formData = new FormData();
+        formData.append("nome", nome);
+
+        try {
+            const res = await fetch(`/api/campeonatos/${campId}/times`, { method: "POST", body: formData });
+            if (res.ok) {
+                showToast("Time adicionado com sucesso!", "success");
+                document.getElementById("new-team-name").value = "";
+                loadChampionshipTeams(campId);
+            } else {
+                showToast(await res.text(), "error");
+            }
+        } catch (err) {
+            showToast("Erro ao adicionar time.", "error");
+        }
+    });
 }
 
 // ==========================================
@@ -437,6 +468,7 @@ function renderChampionshipsList() {
                         </span>
                     </div>
                     <div class="col-card-actions">
+                        <button class="btn-icon" title="Gerenciar Times" onclick="openChampionshipTeamsModal('${c.id}', '${c.nome}')" style="background: rgba(0, 255, 255, 0.08); color: var(--color-cyan); margin-right: 0.25rem;"><i class="fa-solid fa-shield-halved"></i></button>
                         <button class="btn-icon btn-edit-col" onclick="editChampionship('${c.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
                         <button class="btn-icon btn-delete-col" onclick="deleteChampionship('${c.id}', '${c.nome}')"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -550,7 +582,7 @@ function renderMatchesList() {
     }).join("");
 }
 
-function openMatchModal(editId = null) {
+async function openMatchModal(editId = null) {
     const form = document.getElementById("form-match");
     form.reset();
     document.getElementById("match-id").value = "";
@@ -562,8 +594,10 @@ function openMatchModal(editId = null) {
             document.getElementById("match-id").value = m.id;
             document.getElementById("match-championship").value = m.campeonato_id;
             document.getElementById("match-round").value = m.rodada;
-            document.getElementById("match-home").value = m.time_casa;
-            document.getElementById("match-away").value = m.time_fora;
+            
+            // Carrega times do campeonato e pré-seleciona os times da partida
+            await updateMatchTeamsSelects(m.campeonato_id, m.time_casa, m.time_fora);
+            
             document.getElementById("match-gols-home").value = m.gols_casa !== null ? m.gols_casa : "";
             document.getElementById("match-gols-away").value = m.gols_fora !== null ? m.gols_fora : "";
             document.getElementById("match-video").value = m.video_url || "";
@@ -576,12 +610,16 @@ function openMatchModal(editId = null) {
             document.getElementById("match-ended").checked = !!m.encerrada;
             document.getElementById("modal-match-title").textContent = "Editar Jogo";
         }
+    } else {
+        // Reseta os selects de times para novo jogo
+        document.getElementById("match-home").innerHTML = '<option value="">Selecione o time...</option>';
+        document.getElementById("match-away").innerHTML = '<option value="">Selecione o time...</option>';
     }
     openModal("modal-match");
 }
 
-window.editMatch = function(id) {
-    openMatchModal(id);
+window.editMatch = async function(id) {
+    await openMatchModal(id);
 };
 
 window.deleteMatch = async function(id) {
@@ -803,3 +841,96 @@ function showToast(message, type = "info") {
         });
     }, 4000);
 }
+
+
+// ==========================================
+// ESTRUTURAS AUXILIARES PARA TIMES DO CAMPEONATO
+// ==========================================
+
+async function updateMatchTeamsSelects(campId, selectedHome = "", selectedAway = "") {
+    const homeSelect = document.getElementById("match-home");
+    const awaySelect = document.getElementById("match-away");
+    
+    if (!homeSelect || !awaySelect) return;
+    
+    homeSelect.innerHTML = '<option value="">Selecione o time...</option>';
+    awaySelect.innerHTML = '<option value="">Selecione o time...</option>';
+    
+    if (!campId) return;
+    
+    try {
+        const res = await fetch(`/api/public/campeonatos/${campId}/times`);
+        if (res.ok) {
+            const times = await res.json();
+            if (times.length === 0) {
+                homeSelect.innerHTML = '<option value="">Nenhum time cadastrado neste campeonato</option>';
+                awaySelect.innerHTML = '<option value="">Nenhum time cadastrado neste campeonato</option>';
+                return;
+            }
+            
+            const options = times.map(t => `<option value="${t.nome}">${t.nome}</option>`).join("");
+            
+            homeSelect.innerHTML = '<option value="">Selecione o time...</option>' + options;
+            awaySelect.innerHTML = '<option value="">Selecione o time...</option>' + options;
+            
+            if (selectedHome) homeSelect.value = selectedHome;
+            if (selectedAway) awaySelect.value = selectedAway;
+        }
+    } catch (err) {
+        console.error("Erro ao carregar times da partida:", err);
+    }
+}
+
+window.openChampionshipTeamsModal = async function(campId, campNome) {
+    document.getElementById("teams-camp-id").value = campId;
+    document.getElementById("modal-teams-title").textContent = `Times — ${campNome}`;
+    document.getElementById("new-team-name").value = "";
+    
+    openModal("modal-teams");
+    await loadChampionshipTeams(campId);
+};
+
+async function loadChampionshipTeams(campId) {
+    const list = document.getElementById("teams-list");
+    if (!list) return;
+    
+    list.innerHTML = '<li style="color: var(--text-muted); text-align: center; padding: 1rem 0;">Carregando times...</li>';
+    
+    try {
+        const res = await fetch(`/api/public/campeonatos/${campId}/times`);
+        if (res.ok) {
+            const times = await res.json();
+            if (times.length === 0) {
+                list.innerHTML = '<li style="color: var(--text-muted); text-align: center; padding: 1rem 0;">Nenhum time cadastrado neste campeonato.</li>';
+                return;
+            }
+            
+            list.innerHTML = times.map(t => `
+                <li style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:0.6rem 0.8rem; border-radius:8px; border:1px solid var(--border-card); margin-bottom: 0.5rem;">
+                    <span style="font-weight:600; color: #fff;">${t.nome}</span>
+                    <button class="btn-icon text-danger" onclick="deleteChampionshipTeam('${t.id}', '${campId}', '${t.nome}')" style="padding:0.25rem; border:none; background:none;"><i class="fa-solid fa-trash"></i></button>
+                </li>
+            `).join("");
+        } else {
+            list.innerHTML = '<li style="color: var(--color-red); text-align: center; padding: 1rem 0;">Erro ao carregar times.</li>';
+        }
+    } catch (err) {
+        console.error("Erro ao obter times:", err);
+        list.innerHTML = '<li style="color: var(--color-red); text-align: center; padding: 1rem 0;">Erro de conexão.</li>';
+    }
+}
+
+window.deleteChampionshipTeam = async function(timeId, campId, nome) {
+    if (!confirm(`Deseja realmente excluir o time "${nome}"?`)) return;
+    try {
+        const res = await fetch(`/api/times/${timeId}`, { method: "DELETE" });
+        if (res.ok) {
+            showToast("Time removido com sucesso!", "success");
+            await loadChampionshipTeams(campId);
+        } else {
+            showToast(await res.text(), "error");
+        }
+    } catch (err) {
+        showToast("Erro ao excluir time.", "error");
+    }
+};

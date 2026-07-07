@@ -30,6 +30,7 @@ from database import (
     db_get, db_upsert, db_delete,
     get_user_profile, save_user_profile,
     get_all_players, get_all_users, get_all_collections,
+    get_campeonato_times, save_time, delete_time
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -705,6 +706,37 @@ async def api_delete_jogador_liga_endpoint(request: web.Request) -> web.Response
     return web.Response(text="Erro ao deletar estatísticas do jogador.", status=500)
 
 
+async def api_get_campeonato_times_endpoint(request: web.Request) -> web.Response:
+    c_id = request.match_info.get("id")
+    times = await get_campeonato_times(c_id)
+    return web.json_response(times)
+
+
+@login_required
+async def api_post_time_endpoint(request: web.Request) -> web.Response:
+    c_id = request.match_info.get("id")
+    data = await request.post()
+    nome = data.get("nome", "").strip()
+    time_id = data.get("id", "").strip() or None
+
+    if not nome:
+        return web.Response(text="Nome do time é obrigatório.", status=400)
+
+    success = await save_time(c_id, nome, time_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao salvar time.", status=500)
+
+
+@login_required
+async def api_delete_time_endpoint(request: web.Request) -> web.Response:
+    time_id = request.match_info.get("id")
+    success = await delete_time(time_id)
+    if success:
+        return web.json_response({"success": True})
+    return web.Response(text="Erro ao deletar time.", status=500)
+
+
 # ==============================================================================
 # CONFIGURAÇÃO E INÍCIO DO SERVIDOR WEB
 # ==============================================================================
@@ -730,6 +762,11 @@ async def start_web_server():
     app.router.add_get("/api/public/campeonatos",         api_get_public_campeonatos)
     app.router.add_post("/api/campeonatos",               api_post_campeonato)
     app.router.add_delete("/api/campeonatos/{id}",        api_delete_campeonato_endpoint)
+
+    # Times dos Campeonatos
+    app.router.add_get("/api/public/campeonatos/{id}/times", api_get_campeonato_times_endpoint)
+    app.router.add_post("/api/campeonatos/{id}/times",        api_post_time_endpoint)
+    app.router.add_delete("/api/times/{id}",                 api_delete_time_endpoint)
 
     # Partidas
     app.router.add_get("/api/public/partidas",             api_get_public_partidas)

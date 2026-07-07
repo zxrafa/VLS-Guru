@@ -94,6 +94,15 @@ def init_db():
                 FOREIGN KEY(campeonato_id) REFERENCES campeonatos(id) ON DELETE CASCADE
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS times (
+                id TEXT PRIMARY KEY,
+                campeonato_id TEXT,
+                nome TEXT NOT NULL,
+                criado_em TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(campeonato_id) REFERENCES campeonatos(id) ON DELETE CASCADE
+            )
+        """)
         conn.commit()
         conn.close()
 
@@ -735,5 +744,92 @@ async def delete_jogador_liga(player_id: str) -> bool:
                 return True
             except Exception as e:
                 print(f"Erro ao deletar jogador_liga local: {e}")
+                return False
+        return await asyncio.to_thread(remove)
+
+
+# ─── FUNÇÕES DE GERENCIAMENTO DE TIMES DOS CAMPEONATOS ──────────────────────────
+
+async def get_campeonato_times(campeonato_id: str) -> list[dict]:
+    if use_supabase:
+        def fetch():
+            try:
+                res = supabase_client.table("times").select("*").eq("campeonato_id", campeonato_id).order("nome").execute()
+                return res.data or []
+            except Exception as e:
+                print(f"Erro ao obter times: {e}")
+                return []
+        return await asyncio.to_thread(fetch)
+    else:
+        def fetch():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, campeonato_id, nome, criado_em FROM times WHERE campeonato_id = ? ORDER BY nome", (campeonato_id,))
+                rows = cursor.fetchall()
+                conn.close()
+                return [{"id": r[0], "campeonato_id": r[1], "nome": r[2], "criado_em": r[3]} for r in rows]
+            except Exception as e:
+                print(f"Erro ao obter times local: {e}")
+                return []
+        return await asyncio.to_thread(fetch)
+
+
+async def save_time(campeonato_id: str, nome: str, time_id: str = None) -> bool:
+    if not time_id:
+        import uuid
+        time_id = str(uuid.uuid4())
+    if use_supabase:
+        def save():
+            try:
+                supabase_client.table("times").upsert({
+                    "id": time_id,
+                    "campeonato_id": campeonato_id,
+                    "nome": nome
+                }).execute()
+                return True
+            except Exception as e:
+                print(f"Erro ao salvar time: {e}")
+                return False
+        return await asyncio.to_thread(save)
+    else:
+        def save():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT OR REPLACE INTO times (id, campeonato_id, nome) VALUES (?, ?, ?)",
+                    (time_id, campeonato_id, nome)
+                )
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                print(f"Erro ao salvar time local: {e}")
+                return False
+        return await asyncio.to_thread(save)
+
+
+async def delete_time(time_id: str) -> bool:
+    if use_supabase:
+        def remove():
+            try:
+                supabase_client.table("times").delete().eq("id", time_id).execute()
+                return True
+            except Exception as e:
+                print(f"Erro ao deletar time: {e}")
+                return False
+        return await asyncio.to_thread(remove)
+    else:
+        def remove():
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM times WHERE id = ?", (time_id,))
+                conn.commit()
+                conn.close()
+                return True
+            except Exception as e:
+                print(f"Erro ao deletar time local: {e}")
                 return False
         return await asyncio.to_thread(remove)

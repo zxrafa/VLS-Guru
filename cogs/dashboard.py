@@ -173,10 +173,11 @@ def build_jogadores_panel(owner_id: int):
         description="Gerencie as cartas globais disponíveis no sistema.",
         color=discord.Color.gold()
     )
-    embed.add_field(name="➕ Criar Jogador", value="Adiciona uma nova carta ao banco global (3 etapas).", inline=True)
-    embed.add_field(name="✏️ Editar Jogador", value="Edita dados de um jogador existente por ID.", inline=True)
-    embed.add_field(name="🗑️ Deletar Jogador", value="Remove permanentemente uma carta do sistema.", inline=True)
-    embed.add_field(name="📋 Listar Jogadores", value="Lista todos os jogadores cadastrados.", inline=True)
+    embed.add_field(name="➕ Criar Jogador", value="Adiciona uma nova carta ao banco global.", inline=True)
+    embed.add_field(name="✏️ Editar Jogador", value="Edita dados de um jogador por ID.", inline=True)
+    embed.add_field(name="🗑️ Deletar Jogador", value="Remove uma carta do catálogo.", inline=True)
+    embed.add_field(name="📋 Listar Jogadores", value="Lista os jogadores cadastrados.", inline=True)
+    embed.add_field(name="📤 Importar em Massa (TXT)", value="Adiciona múltiplos jogadores de uma vez só.", inline=True)
     embed.set_footer(text="← Voltar: use /admin novamente")
     return embed, JogadoresView(owner_id)
 
@@ -222,6 +223,24 @@ class JogadoresView(discord.ui.View):
                 f"**📋 Jogadores ({idx+1}/{len(chunks)}):**\n" + "\n".join(chunk),
                 ephemeral=True
             )
+
+    @discord.ui.button(label="📤 Importar em Massa (TXT)", style=discord.ButtonStyle.secondary, row=1)
+    async def importar_jogadores(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+        await interaction.response.send_message(
+            "📝 **Como importar jogadores em massa:**\n"
+            "Use o comando de barra: **`/importar_txt`** anexando o arquivo `.txt` contendo os jogadores.\n\n"
+            "**Formato de cada linha do arquivo TXT:**\n"
+            "`Nome | Overall | Posição | ID_Coleção | Nacionalidade | Clube | Link_Foto (Opcional)`\n\n"
+            "**Exemplo:**\n"
+            "```text\n"
+            "Lionel Messi | 91 | ST | base | Argentino | Inter Miami\n"
+            "Cristiano Ronaldo | 88 | ST | base | Portugues | Al-Nassr\n"
+            "Alisson | 89 | GK | base | Brasileiro | Liverpool | https://i.ibb.co/foto.png\n"
+            "```",
+            ephemeral=True
+        )
 
 
 # ─── Criar Jogador: 3 modals encadeados ───────────────────

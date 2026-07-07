@@ -1,3 +1,15 @@
+// Interceptador global do fetch para injetar a senha de autenticação
+const originalFetch = window.fetch;
+window.fetch = function(url, options) {
+    options = options || {};
+    options.headers = options.headers || {};
+    const adminToken = localStorage.getItem("admin_token");
+    if (adminToken) {
+        options.headers["Authorization"] = "Bearer " + adminToken;
+    }
+    return originalFetch(url, options);
+};
+
 // ==========================================
 // CONFIGURAÇÕES E ESTADO GLOBAL DO APP
 // ==========================================
@@ -16,6 +28,48 @@ document.addEventListener("DOMContentLoaded", async () => {
     initFormHandlers();
     initModalControls();
     
+    // Configura botão de submissão de senha
+    const btnSubmit = document.getElementById("btn-submit-password");
+    const inputPass = document.getElementById("admin-password-input");
+    const errPanel = document.getElementById("login-error-msg");
+
+    const handleLoginSubmit = async () => {
+        const pass = inputPass.value.trim();
+        if (!pass) return;
+
+        // Testa a senha fazendo fetch no status
+        errPanel.style.display = "none";
+        try {
+            const res = await originalFetch("/api/auth/status", {
+                headers: { "Authorization": "Bearer " + pass }
+            });
+            if (res.status === 200) {
+                const data = await res.json();
+                if (data.logged_in && data.is_admin) {
+                    localStorage.setItem("admin_token", pass);
+                    currentUser = data.user;
+                    showAppScreen();
+                    loadInitialData();
+                    showToast("Acesso concedido!", "success");
+                } else {
+                    errPanel.style.display = "block";
+                }
+            } else {
+                errPanel.style.display = "block";
+            }
+        } catch (err) {
+            console.error(err);
+            errPanel.style.display = "block";
+        }
+    };
+
+    btnSubmit.addEventListener("click", handleLoginSubmit);
+    inputPass.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+            handleLoginSubmit();
+        }
+    });
+
     // Checa status de login
     await checkAuthStatus();
 });
@@ -72,6 +126,7 @@ function initTabNavigation() {
 
     // Logout
     document.getElementById("btn-logout").addEventListener("click", async () => {
+        localStorage.removeItem("admin_token");
         await fetch("/api/auth/logout");
         showToast("Sessão encerrada com sucesso.", "info");
         showLoginScreen();

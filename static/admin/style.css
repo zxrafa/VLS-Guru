@@ -8,18 +8,20 @@
     --bg-modal: rgba(10, 11, 14, 0.85);
     
     --border-glass: rgba(255, 255, 255, 0.06);
-    --border-active: rgba(147, 51, 234, 0.3);
+    --color-pink: #ff007f;
+    --color-cyan: #00ffff;
     
-    --text-main: #f3f4f6;
-    --text-muted: #9ca3af;
-    
-    --color-blue: #3b82f6;
-    --color-purple: #a855f7;
+    --color-blue: #00ffff;
+    --color-purple: #ff007f;
     --color-gold: #fbbf24;
     --color-green: #10b981;
     --color-red: #ef4444;
     
-    --shadow-neon: 0 0 20px rgba(168, 85, 247, 0.15);
+    --text-main: #f3f4f6;
+    --text-muted: #9ca3af;
+    
+    --border-active: rgba(0, 255, 255, 0.3);
+    --shadow-neon: 0 0 20px rgba(0, 255, 255, 0.2);
     --shadow-main: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     
     --font-outfit: 'Outfit', sans-serif;

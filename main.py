@@ -39,7 +39,7 @@ load_dotenv(dotenv_path=os.path.join(BASE_DIR, ".env"))
 DISCORD_TOKEN         = os.getenv("DISCORD_TOKEN")
 DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8080/callback")
+DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "https://vlsleague.squareweb.app/callback")
 IMGBB_API_KEY         = "617c898158c94ac25ddaf2491ee7d0b4"
 
 # IDs de usuários com acesso total ao painel admin, mesmo sem ser admin de servidor
@@ -64,14 +64,21 @@ def login_required(func):
     """Decorator que bloqueia rotas da API caso o usuário não esteja autenticado como admin."""
     @functools.wraps(func)
     async def wrapper(request: web.Request, *args, **kwargs):
+        # 1. Verifica token estático para simplificar login administrativo do painel
+        auth_header = request.headers.get("Authorization")
+        if auth_header == "Bearer VirtuaLS" or auth_header == "VirtuaLS":
+            return await func(request, *args, **kwargs)
+
+        # 2. Fallback para sessão do Discord
         session = get_session(request)
-        if not session or not session.get("is_admin"):
-            return web.json_response(
-                {"error": "Acesso negado. Autenticação de administrador obrigatória."},
-                status=401,
-            )
-        request["session"] = session
-        return await func(request, *args, **kwargs)
+        if session and session.get("is_admin"):
+            request["session"] = session
+            return await func(request, *args, **kwargs)
+
+        return web.json_response(
+            {"error": "Acesso negado. Autenticação de administrador obrigatória."},
+            status=401,
+        )
     return wrapper
 
 
@@ -190,6 +197,18 @@ async def handle_callback(request: web.Request) -> web.Response:
 
 
 async def api_auth_status(request: web.Request) -> web.Response:
+    auth_header = request.headers.get("Authorization")
+    if auth_header == "Bearer VirtuaLS" or auth_header == "VirtuaLS":
+        return web.json_response({
+            "logged_in": True,
+            "is_admin": True,
+            "user": {
+                "username": "Admin VLS",
+                "global_name": "Administrador da Liga",
+                "avatar_url": "https://i.ibb.co/bMHVPgbd/54d7bc1101119ff3a1643b475250cd0b.webp"
+            }
+        })
+
     session = get_session(request)
     if session:
         return web.json_response({"logged_in": True, "is_admin": session["is_admin"], "user": session["user"]})

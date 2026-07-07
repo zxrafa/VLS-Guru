@@ -22,14 +22,18 @@
     <div id="login-screen" class="login-container">
         <div class="login-card">
             <div class="logo-area">
-                <i class="fa-solid fa-shield-halved logo-icon"></i>
-                <h1>VLS GURU</h1>
-                <p>Painel Administrativo da Liga</p>
+                <img src="https://i.ibb.co/bMHVPgbd/54d7bc1101119ff3a1643b475250cd0b.webp" alt="VLS League Logo" class="logo-img" style="max-height: 100px; margin-bottom: 1rem;">
+                <h1>PAINEL ADM</h1>
+                <p>Liga VLS</p>
             </div>
-            <p class="login-description">Faça login com sua conta do Discord para gerenciar jogadores, saldos dos managers e ver estatísticas da liga.</p>
-            <a href="/login" class="btn btn-discord">
-                <i class="fa-brands fa-discord"></i> Entrar com o Discord
-            </a>
+            <p class="login-description">Insira a senha de acesso administrativo para abrir o painel da liga.</p>
+            <div class="login-form-group" style="width: 100%; display: flex; flex-direction: column; gap: 0.8rem;">
+                <input type="password" id="admin-password-input" placeholder="Senha do Administrador" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-glass); color: #fff; padding: 0.75rem 1rem; border-radius: 8px; font-family: inherit; font-size: 0.95rem; outline: none; text-align: center; width: 100%;">
+                <button id="btn-submit-password" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-pink), var(--color-cyan)); border: none; font-weight: 700; width: 100%; justify-content: center;">
+                    Entrar <i class="fa-solid fa-right-to-bracket" style="margin-left: 0.5rem;"></i>
+                </button>
+            </div>
+            <p id="login-error-msg" style="color: var(--color-red); font-size: 0.85rem; margin-top: 0.8rem; display: none; font-weight: 500;">Senha incorreta! Tente novamente.</p>
         </div>
     </div>
 
@@ -37,10 +41,10 @@
     <div id="app-screen" class="app-layout" style="display: none;">
         <!-- Sidebar lateral premium -->
         <aside class="sidebar">
-            <div class="sidebar-header">
-                <i class="fa-solid fa-shield-halved sidebar-logo"></i>
+            <div class="sidebar-header" style="display: flex; align-items: center; gap: 0.8rem; padding: 1.5rem 1.25rem;">
+                <img src="https://i.ibb.co/bMHVPgbd/54d7bc1101119ff3a1643b475250cd0b.webp" alt="VLS Logo" style="max-height: 42px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
                 <div class="sidebar-title-area">
-                    <h2>VLS GURU</h2>
+                    <h2>LIGA VLS</h2>
                     <span>Admin Dashboard</span>
                 </div>
             </div>

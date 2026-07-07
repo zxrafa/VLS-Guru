@@ -818,56 +818,11 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         pass
 
 
-def kill_duplicate_processes():
-    import subprocess
-    import os
-    import json
-    
-    my_pid = os.getpid()
-    cmd = [
-        "powershell", 
-        "-NoProfile", 
-        "-ExecutionPolicy", "Bypass", 
-        "-Command", 
-        "Get-CimInstance Win32_Process -Filter \"Name LIKE 'python%'\" | Select-Object ProcessId, CommandLine | ConvertTo-Json"
-    ]
-    try:
-        out = subprocess.check_output(cmd).decode("utf-8", errors="ignore").strip()
-        if not out:
-            return
-            
-        try:
-            processes = json.loads(out)
-            if not isinstance(processes, list):
-                processes = [processes]
-        except Exception:
-            processes = []
-            
-        for p in processes:
-            pid = p.get("ProcessId")
-            cmdline = p.get("CommandLine") or ""
-            
-            if not pid or pid == my_pid:
-                continue
-                
-            if "main.py" in cmdline.lower():
-                print(f"⚠️ [Autoclean] Encerrando bot duplicado em execução (PID {pid})...")
-                try:
-                    subprocess.call(f"taskkill /F /PID {pid}", shell=True)
-                except Exception as e:
-                    print(f"❌ [Autoclean] Erro ao derrubar PID {pid}: {e}")
-    except Exception as e:
-        print(f"❌ [Autoclean] Falha ao executar varredura de processos: {e}")
-
-
 async def main():
     if not DISCORD_TOKEN:
         print("❌ DISCORD_TOKEN ausente no arquivo .env. Encerrando.")
         return
         
-    # Remove qualquer outra instância duplicada do bot rodando em segundo plano antes de iniciar
-    kill_duplicate_processes()
-    
     await bot.start(DISCORD_TOKEN)
 
 

@@ -39,13 +39,9 @@ class ChatCog(commands.Cog, name="Chat"):
         if not content:
             return
 
-        # Filtro básico contra spam óbvio de risadas ou letras muito curtas
-        if len(content) < 4:
-            return
-        
-        # Risadas (kkkk / ahaha / rsrs)
+        # Filtro básico contra risadas puras e spams contínuos kkkk / ahaha / rsrs
         lower_content = content.lower()
-        if all(c in "k" for c in lower_content) or all(c in "ha" for c in lower_content):
+        if all(c in "k" for c in lower_content) or all(c in "ha" for c in lower_content) or all(c in "rs" for c in lower_content):
             return
 
         # URL do endpoint do Gemini
@@ -55,10 +51,10 @@ class ChatCog(commands.Cog, name="Chat"):
             "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
             "use linguagem super humana da internet: tudo minúsculo, pouquíssimas ou nenhuma vírgula, "
             "abreviações (pq, tbm, vlw, blz, nd, gnt, etc.). responda no máximo com 1 ou 2 frases curtas. "
+            "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
+            "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
             "se a mensagem do usuário for uma sugestão, relato de bug, ideia ou reclamação, confirme que vai "
-            "guardar/anotar de forma bem informal (ex: 'blz mano vo salvar aq', 'vlw pela ideia blz vo anotar'). "
-            "se a mensagem do usuário for um spam, mensagem muito curta sem contexto (tipo risadas, letras aleatórias, "
-            "apenas saudações soltas sem assunto), responda apenas com a palavra [IGNORE]."
+            "guardar/anotar de forma bem informal (ex: 'blz mano vo salvar aq', 'vlw pela ideia blz vo anotar')."
         )
 
         payload = {

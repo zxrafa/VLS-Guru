@@ -13,7 +13,7 @@ import asyncio
 from database import (
     get_user_profile, save_user_profile,
     get_all_users, db_get, db_upsert, db_delete,
-    get_user_lock,
+    get_user_lock, lock_user,
 )
 from simulation import run_match_simulation, calculate_chemistry_bonus
 from config import VLS_COINS_EMOJI

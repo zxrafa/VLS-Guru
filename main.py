@@ -110,15 +110,23 @@ async def handle_paineladm(request: web.Request) -> web.Response:
     return web.FileResponse(admin_index)
 
 
+def get_redirect_uri(request: web.Request) -> str:
+    host = request.headers.get("Host", "").lower()
+    if "squareweb.app" in host or "vlsleague" in host:
+        return "https://vlsleague.squareweb.app/callback"
+    return DISCORD_REDIRECT_URI
+
+
 async def handle_login(request: web.Request) -> web.HTTPFound:
     client_id = DISCORD_CLIENT_ID or (str(bot.user.id) if bot.user else None)
     if not client_id:
         return web.Response(text="Erro: DISCORD_CLIENT_ID não configurado no .env.", status=500)
 
+    redirect_uri = get_redirect_uri(request)
     auth_url = (
         f"https://discord.com/api/oauth2/authorize"
         f"?client_id={client_id}"
-        f"&redirect_uri={DISCORD_REDIRECT_URI}"
+        f"&redirect_uri={redirect_uri}"
         f"&response_type=code"
         f"&scope=identify"
     )
@@ -135,6 +143,7 @@ async def handle_callback(request: web.Request) -> web.Response:
     if not client_id or not client_secret:
         return web.Response(text="Erro: credenciais OAuth2 não configuradas no .env.", status=500)
 
+    redirect_uri = get_redirect_uri(request)
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
@@ -144,7 +153,7 @@ async def handle_callback(request: web.Request) -> web.Response:
                     "client_secret": client_secret,
                     "grant_type":    "authorization_code",
                     "code":          code,
-                    "redirect_uri":  DISCORD_REDIRECT_URI,
+                    "redirect_uri":  redirect_uri,
                 },
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             ) as resp:

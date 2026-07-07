@@ -472,6 +472,33 @@ class TeamCog(commands.Cog, name="Equipe"):
                 
         await interaction.followup.send(embed=embed, view=view)
 
+    @app_commands.command(name="fundir", description="Funde cartas reservas para dar XP e fazer upgrade (+3 OVR) em um jogador favorito.")
+    @lock_user()
+    async def fundir(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        profile = await get_user_profile(interaction.user)
+        inventory = profile.get("inventory", [])
+        
+        if len(inventory) < 2:
+            return await interaction.followup.send(
+                "❌ Você precisa de pelo menos 2 jogadores no seu inventário para realizar uma fusão.",
+                ephemeral=True
+            )
+            
+        # Sorteia os jogadores por overall decrescente
+        sorted_players = sorted(inventory, key=lambda x: x.get("over", 0), reverse=True)
+        
+        embed = discord.Embed(
+            title="🔮 Fusão de Cartas — Selecionar Alvo",
+            description="Escolha abaixo qual jogador do seu elenco você deseja **EVOLUIR**.\n"
+                        f"Cada fusão custará **10 {VLS_COINS_EMOJI} VLS Coins**.",
+            color=discord.Color.dark_purple()
+        )
+        
+        view = FusaoAlvoView(interaction.user.id, sorted_players)
+        await interaction.followup.send(embed=embed, view=view)
+
     def generate_player_show_embed(self, player: dict) -> discord.Embed:
         """Gera o embed reformulado da ficha de um jogador."""
         wf = player.get("weak_foot", 1)
@@ -1470,34 +1497,6 @@ class PlayerScaleCarouselView(discord.ui.View):
         else:
             await interaction.response.edit_message(embed=embed, attachments=[], view=self)
 
-
-
-    @app_commands.command(name="fundir", description="Funde cartas reservas para dar XP e fazer upgrade (+3 OVR) em um jogador favorito.")
-    @lock_user()
-    async def fundir(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        
-        profile = await get_user_profile(interaction.user)
-        inventory = profile.get("inventory", [])
-        
-        if len(inventory) < 2:
-            return await interaction.followup.send(
-                "❌ Você precisa de pelo menos 2 jogadores no seu inventário para realizar uma fusão.",
-                ephemeral=True
-            )
-            
-        # Sorteia os jogadores por overall decrescente
-        sorted_players = sorted(inventory, key=lambda x: x.get("over", 0), reverse=True)
-        
-        embed = discord.Embed(
-            title="🔮 Fusão de Cartas — Selecionar Alvo",
-            description="Escolha abaixo qual jogador do seu elenco você deseja **EVOLUIR**.\n"
-                        f"Cada fusão custará **10 {VLS_COINS_EMOJI} VLS Coins**.",
-            color=discord.Color.dark_purple()
-        )
-        
-        view = FusaoAlvoView(interaction.user.id, sorted_players)
-        await interaction.followup.send(embed=embed, view=view)
 
 
 class FusaoSacrificioSelect(discord.ui.Select):

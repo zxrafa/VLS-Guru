@@ -935,6 +935,244 @@ class MatchesCog(commands.Cog, name="Partidas"):
         )
 
 
+    # ── MÓDULO 5: DISPUTA DE PÊNALTIS ──────────────────────────────────────────
+
+    @app_commands.command(name="penalti_treino", description="Disputa de pênaltis contra o goleiro da CPU para treinar.")
+    @lock_user()
+    async def penalti_treino(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title="⚽ Disputa de Pênaltis (Treino CPU) — Rodada 1/5",
+            description="👤 **Você:** ⚪ ⚪ ⚪ ⚪ ⚪\n"
+                        "🤖 **CPU:** ⚪ ⚪ ⚪ ⚪ ⚪\n\n"
+                        "Escolha o canto do seu chute abaixo para iniciar a disputa!",
+            color=discord.Color.blue()
+        )
+        view = PenaltiTreinoView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="penalti_desafio", description="Desafia outro manager para uma disputa de pênaltis PvP (com ou sem aposta).")
+    @app_commands.describe(adversario="Oponente para desafiar", aposta="Valor opcional de aposta em dinheiro")
+    @lock_user()
+    async def penalti_desafio(self, interaction: discord.Interaction, adversario: discord.Member, aposta: int = 0):
+        if adversario.id == interaction.user.id:
+            return await interaction.response.send_message("❌ Você não pode desafiar a si mesmo.", ephemeral=True)
+            
+        if aposta < 0:
+            return await interaction.response.send_message("❌ O valor da aposta não pode ser negativo.", ephemeral=True)
+            
+        p1 = await get_user_profile(interaction.user)
+        p2 = await get_user_profile(adversario)
+        
+        if aposta > 0:
+            if p1.get("money", 0) < aposta:
+                return await interaction.response.send_message(f"❌ Você não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
+            if p2.get("money", 0) < aposta:
+                return await interaction.response.send_message(f"❌ O adversário não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
+                
+        aposta_txt = f" apostando **R$ {aposta:,}**" if aposta > 0 else ""
+        embed = discord.Embed(
+            title="⚽ Desafio de Pênaltis PvP!",
+            description=f"⚔️ {interaction.user.mention} desafiou {adversario.mention} para uma disputa de pênaltis{aposta_txt}!\n"
+                        f"Clique no botão verde abaixo para aceitar o desafio.",
+            color=discord.Color.purple()
+        )
+        
+        view = PenaltiAceitarView(self, interaction.user, adversario, aposta)
+        await interaction.response.send_message(embed=embed, view=view)
+
+    # ── MÓDULO 6: MODO LIGA ────────────────────────────────────────────────────
+    
+    @app_commands.command(name="liga", description="Exibe seu status no Modo Liga e permite simular partidas contra a CPU.")
+    @app_commands.choices(acao=[
+        app_commands.Choice(name="Visualizar Status", value="status"),
+        app_commands.Choice(name="Jogar Partida", value="jogar")
+    ])
+    @lock_user()
+    async def liga(self, interaction: discord.Interaction, acao: str):
+        await interaction.response.defer()
+        
+        profile = await get_user_profile(interaction.user)
+        div = profile.setdefault("liga_div", "Bronze")
+        wins = profile.setdefault("liga_wins", 0)
+        losses = profile.setdefault("liga_losses", 0)
+        
+        LIGAS_CONFIG = {
+            "Bronze": {"wins_needed": 3, "losses_cair": None, "ovr_min": 70, "ovr_max": 75, "premio_vitoria": 5_000, "proxima": "Prata", "anterior": None},
+            "Prata": {"wins_needed": 5, "losses_cair": None, "ovr_min": 75, "ovr_max": 79, "premio_vitoria": 8_000, "proxima": "Ouro", "anterior": None},
+            "Ouro": {"wins_needed": 7, "losses_cair": 10, "ovr_min": 80, "ovr_max": 84, "premio_vitoria": 12_000, "proxima": "Esmeralda", "anterior": "Prata"},
+            "Esmeralda": {"wins_needed": 10, "losses_cair": 8, "ovr_min": 84, "ovr_max": 87, "premio_vitoria": 15_000, "proxima": "Diamante", "anterior": "Ouro"},
+            "Diamante": {"wins_needed": 13, "losses_cair": 6, "ovr_min": 87, "ovr_max": 90, "premio_vitoria": 20_000, "proxima": "Icone", "anterior": "Esmeralda"},
+            "Icone": {"wins_needed": 15, "losses_cair": 5, "ovr_min": 90, "ovr_max": 93, "premio_vitoria": 25_000, "proxima": "Dev", "anterior": "Diamante"},
+            "Dev": {"wins_needed": 20, "losses_cair": 3, "ovr_min": 93, "ovr_max": 96, "premio_vitoria": 30_000, "proxima": "VLS", "anterior": "Icone"},
+            "VLS": {"wins_needed": None, "losses_cair": None, "ovr_min": 96, "ovr_max": 99, "premio_vitoria": 40_000, "proxima": None, "anterior": None}
+        }
+        
+        config = LIGAS_CONFIG.get(div, LIGAS_CONFIG["Bronze"])
+        
+        if acao == "status":
+            embed = discord.Embed(
+                title=f"🔥 Modo Liga VLS — {div}",
+                description=(
+                    f"🏆 **Divisão Atual:** Liga **{div}**\n\n"
+                    f"📈 **Vitórias consecutivas:** `{wins}` de **{config['wins_needed'] or '—'}** para subir.\n"
+                    f"📉 **Derrotas consecutivas:** `{losses}` de **{config['losses_cair'] or '—'}** para cair.\n\n"
+                    f"💰 **Prêmio por vitória:** R$ {config['premio_vitoria']:,}\n"
+                    f"🎮 **Nível da CPU:** OVR {config['ovr_min']} - {config['ovr_max']}\n\n"
+                    f"Use `/liga jogar` para disputar a próxima rodada com seu time titular!"
+                ),
+                color=discord.Color.brand_green()
+            )
+            embed.set_footer(text="VLS Liga • Suba até o topo")
+            return await interaction.followup.send(embed=embed)
+            
+        starting_xi = profile.get("starting_xi", [])
+        if len(starting_xi) < 11:
+            return await interaction.followup.send(
+                "❌ Você precisa de **11 titulares escalados** no seu `/time` para disputar a liga.",
+                ephemeral=True
+            )
+            
+        cpu_names = {
+            "Bronze": "Bronze United", "Prata": "Prata FC", "Ouro": "Real Ouro",
+            "Esmeralda": "Esmeralda Athletic", "Diamante": "Diamante City",
+            "Icone": "Icones F.C.", "Dev": "Devs F.C.", "VLS": "VLS All Stars"
+        }
+        cpu_name = cpu_names.get(div, "CPU Club")
+        
+        cpu_xi = []
+        posicoes = ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CAM", "LW", "RW", "ST"]
+        for idx, pos in enumerate(posicoes):
+            ovr = random.randint(config["ovr_min"], config["ovr_max"])
+            cpu_xi.append({
+                "instance_id": f"cpu_{idx}",
+                "name": f"CPU {pos} #{idx}",
+                "pos": pos,
+                "over": ovr,
+                "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
+                "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
+                "col_nome": "Comum",
+                "col_emoji": "⚪"
+            })
+            
+        p1_chem = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
+        cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+        
+        sim_res = run_match_simulation(
+            p1_name = profile.get("club_name", "Meu Clube"),
+            p2_name = cpu_name,
+            p1_xi = starting_xi,
+            p2_xi = cpu_xi,
+            p1_tactic = profile.get("tactic", "padrao"),
+            p2_tactic = "padrao",
+            p1_chem = p1_chem,
+            p2_chem = cpu_chem,
+            p1_formation = profile.get("formation", "4-3-3"),
+            p2_formation = "4-3-3"
+        )
+        
+        gols_user = sim_res["p1_goals"]
+        gols_cpu = sim_res["p2_goals"]
+        
+        resultado_txt = ""
+        money_earned = 0
+        
+        if gols_user > gols_cpu:
+            money_earned = config["premio_vitoria"]
+            profile["money"] += money_earned
+            wins += 1
+            losses = 0
+            
+            subiu = False
+            msg_subida = ""
+            if config["wins_needed"] and wins >= config["wins_needed"]:
+                proxima = config["proxima"]
+                profile["liga_div"] = proxima
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = 0
+                subiu = True
+                msg_subida = f"\n🎉 **UPGRADE DE DIVISÃO!** Você subiu para a **Liga {proxima}**!"
+            else:
+                profile["liga_wins"] = wins
+                profile["liga_losses"] = 0
+                
+            resultado_txt = f"🟩 **Vitória!** R$ {money_earned:,} ganhos.\n📈 Sequência de vitórias: **{wins}/{config['wins_needed'] or '—'}**.{msg_subida}"
+            
+        elif gols_user == gols_cpu:
+            money_earned = int(config["premio_vitoria"] * 0.30)
+            profile["money"] += money_earned
+            wins = 0
+            losses = 0
+            profile["liga_wins"] = 0
+            profile["liga_losses"] = 0
+            
+            resultado_txt = f"🟨 **Empate!** R$ {money_earned:,} de consolação.\nSequências resetadas."
+            
+        else:
+            money_earned = int(config["premio_vitoria"] * 0.10)
+            profile["money"] += money_earned
+            wins = 0
+            losses += 1
+            
+            caiu = False
+            msg_queda = ""
+            if config["losses_cair"] and losses >= config["losses_cair"]:
+                anterior = config["anterior"]
+                profile["liga_div"] = anterior
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = 0
+                caiu = True
+                msg_queda = f"\n📉 **REBAIXAMENTO!** Você caiu para a **Liga {anterior}**!"
+            else:
+                profile["liga_wins"] = 0
+                profile["liga_losses"] = losses
+                
+            cair_info = f"({losses}/{config['losses_cair']})" if config["losses_cair"] else ""
+            resultado_txt = f"🟥 **Derrota!** R$ {money_earned:,} de consolação.\n📉 Sequência de derrotas: **{losses}** {cair_info}.{msg_queda}"
+            
+        await save_user_profile(interaction.user.id, profile)
+        
+        await self.show_simulation_pages(
+            interaction = interaction,
+            p1_name     = profile.get("club_name", "Meu Clube"),
+            p2_name     = cpu_name,
+            sim_res     = sim_res,
+            footer_msg  = resultado_txt
+        )
+
+    # ── MÓDULO 3: COPA RELÂMPAGO ──────────────────────────────────────────────
+
+    @app_commands.command(name="copa", description="Abre inscrições para uma nova Copa Relâmpago de 8 vagas com prêmio de R$ 500k.")
+    @lock_user()
+    async def copa(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        doc_id = f"copa_{interaction.guild.id}"
+        record = await db_get(doc_id)
+        
+        if record and record.get("status") in ["waiting", "running"]:
+            return await interaction.followup.send("❌ Já existe uma copa ativa ou em andamento neste servidor.", ephemeral=True)
+            
+        champ = {
+            "status": "waiting",
+            "participants": [],
+            "round": 1,
+            "matches": []
+        }
+        await db_upsert(doc_id, champ)
+        
+        embed = discord.Embed(
+            title="🏆 Copa Relâmpago VLS",
+            description=f"Inscrições Abertas! Disputa mata-mata rápida por eliminatórias de 8 vagas.\n"
+                        f"💰 **Prêmio do Campeão:** R$ **500.000,00**!\n\n"
+                        f"📊 **Inscritos:** **0/8**\n\n"
+                        f"Clique no botão verde abaixo para se inscrever grátis!",
+            color=discord.Color.gold()
+        )
+        
+        view = CopaParticipateView(interaction.guild.id, self)
+        await interaction.followup.send(embed=embed, view=view)
+
+
 # ==============================================================================
 # VIEWS
 # ==============================================================================
@@ -1208,242 +1446,7 @@ class CampeonatoAdminView(discord.ui.View):
                 view=None
             )
 
-    # ── MÓDULO 5: DISPUTA DE PÊNALTIS ──────────────────────────────────────────
 
-    @app_commands.command(name="penalti_treino", description="Disputa de pênaltis contra o goleiro da CPU para treinar.")
-    @lock_user()
-    async def penalti_treino(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="⚽ Disputa de Pênaltis (Treino CPU) — Rodada 1/5",
-            description="👤 **Você:** ⚪ ⚪ ⚪ ⚪ ⚪\n"
-                        "🤖 **CPU:** ⚪ ⚪ ⚪ ⚪ ⚪\n\n"
-                        "Escolha o canto do seu chute abaixo para iniciar a disputa!",
-            color=discord.Color.blue()
-        )
-        view = PenaltiTreinoView(interaction.user.id)
-        await interaction.response.send_message(embed=embed, view=view)
-
-    @app_commands.command(name="penalti_desafio", description="Desafia outro manager para uma disputa de pênaltis PvP (com ou sem aposta).")
-    @app_commands.describe(adversario="Oponente para desafiar", aposta="Valor opcional de aposta em dinheiro")
-    @lock_user()
-    async def penalti_desafio(self, interaction: discord.Interaction, adversario: discord.Member, aposta: int = 0):
-        if adversario.id == interaction.user.id:
-            return await interaction.response.send_message("❌ Você não pode desafiar a si mesmo.", ephemeral=True)
-            
-        if aposta < 0:
-            return await interaction.response.send_message("❌ O valor da aposta não pode ser negativo.", ephemeral=True)
-            
-        p1 = await get_user_profile(interaction.user)
-        p2 = await get_user_profile(adversario)
-        
-        if aposta > 0:
-            if p1.get("money", 0) < aposta:
-                return await interaction.response.send_message(f"❌ Você não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
-            if p2.get("money", 0) < aposta:
-                return await interaction.response.send_message(f"❌ O adversário não possui saldo de R$ {aposta:,} para apostar.", ephemeral=True)
-                
-        aposta_txt = f" apostando **R$ {aposta:,}**" if aposta > 0 else ""
-        embed = discord.Embed(
-            title="⚽ Desafio de Pênaltis PvP!",
-            description=f"⚔️ {interaction.user.mention} desafiou {adversario.mention} para uma disputa de pênaltis{aposta_txt}!\n"
-                        f"Clique no botão verde abaixo para aceitar o desafio.",
-            color=discord.Color.purple()
-        )
-        
-        view = PenaltiAceitarView(self, interaction.user, adversario, aposta)
-        await interaction.response.send_message(embed=embed, view=view)
-
-    # ── MÓDULO 6: MODO LIGA ────────────────────────────────────────────────────
-    
-    @app_commands.command(name="liga", description="Exibe seu status no Modo Liga e permite simular partidas contra a CPU.")
-    @app_commands.choices(acao=[
-        app_commands.Choice(name="Visualizar Status", value="status"),
-        app_commands.Choice(name="Jogar Partida", value="jogar")
-    ])
-    @lock_user()
-    async def liga(self, interaction: discord.Interaction, acao: str):
-        await interaction.response.defer()
-        
-        profile = await get_user_profile(interaction.user)
-        div = profile.setdefault("liga_div", "Bronze")
-        wins = profile.setdefault("liga_wins", 0)
-        losses = profile.setdefault("liga_losses", 0)
-        
-        LIGAS_CONFIG = {
-            "Bronze": {"wins_needed": 3, "losses_cair": None, "ovr_min": 70, "ovr_max": 75, "premio_vitoria": 5_000, "proxima": "Prata", "anterior": None},
-            "Prata": {"wins_needed": 5, "losses_cair": None, "ovr_min": 75, "ovr_max": 79, "premio_vitoria": 8_000, "proxima": "Ouro", "anterior": None},
-            "Ouro": {"wins_needed": 7, "losses_cair": 10, "ovr_min": 80, "ovr_max": 84, "premio_vitoria": 12_000, "proxima": "Esmeralda", "anterior": "Prata"},
-            "Esmeralda": {"wins_needed": 10, "losses_cair": 8, "ovr_min": 84, "ovr_max": 87, "premio_vitoria": 15_000, "proxima": "Diamante", "anterior": "Ouro"},
-            "Diamante": {"wins_needed": 13, "losses_cair": 6, "ovr_min": 87, "ovr_max": 90, "premio_vitoria": 20_000, "proxima": "Icone", "anterior": "Esmeralda"},
-            "Icone": {"wins_needed": 15, "losses_cair": 5, "ovr_min": 90, "ovr_max": 93, "premio_vitoria": 25_000, "proxima": "Dev", "anterior": "Diamante"},
-            "Dev": {"wins_needed": 20, "losses_cair": 3, "ovr_min": 93, "ovr_max": 96, "premio_vitoria": 30_000, "proxima": "VLS", "anterior": "Icone"},
-            "VLS": {"wins_needed": None, "losses_cair": None, "ovr_min": 96, "ovr_max": 99, "premio_vitoria": 40_000, "proxima": None, "anterior": None}
-        }
-        
-        config = LIGAS_CONFIG.get(div, LIGAS_CONFIG["Bronze"])
-        
-        if acao == "status":
-            embed = discord.Embed(
-                title=f"🔥 Modo Liga VLS — {div}",
-                description=(
-                    f"🏆 **Divisão Atual:** Liga **{div}**\n\n"
-                    f"📈 **Vitórias consecutivas:** `{wins}` de **{config['wins_needed'] or '—'}** para subir.\n"
-                    f"📉 **Derrotas consecutivas:** `{losses}` de **{config['losses_cair'] or '—'}** para cair.\n\n"
-                    f"💰 **Prêmio por vitória:** R$ {config['premio_vitoria']:,}\n"
-                    f"🎮 **Nível da CPU:** OVR {config['ovr_min']} - {config['ovr_max']}\n\n"
-                    f"Use `/liga jogar` para disputar a próxima rodada com seu time titular!"
-                ),
-                color=discord.Color.brand_green()
-            )
-            embed.set_footer(text="VLS Liga • Suba até o topo")
-            return await interaction.followup.send(embed=embed)
-            
-        starting_xi = profile.get("starting_xi", [])
-        if len(starting_xi) < 11:
-            return await interaction.followup.send(
-                "❌ Você precisa de **11 titulares escalados** no seu `/time` para disputar a liga.",
-                ephemeral=True
-            )
-            
-        cpu_names = {
-            "Bronze": "Bronze United", "Prata": "Prata FC", "Ouro": "Real Ouro",
-            "Esmeralda": "Esmeralda Athletic", "Diamante": "Diamante City",
-            "Icone": "Icones F.C.", "Dev": "Devs F.C.", "VLS": "VLS All Stars"
-        }
-        cpu_name = cpu_names.get(div, "CPU Club")
-        
-        cpu_xi = []
-        posicoes = ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CAM", "LW", "RW", "ST"]
-        for idx, pos in enumerate(posicoes):
-            ovr = random.randint(config["ovr_min"], config["ovr_max"])
-            cpu_xi.append({
-                "instance_id": f"cpu_{idx}",
-                "name": f"CPU {pos} #{idx}",
-                "pos": pos,
-                "over": ovr,
-                "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
-                "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
-                "col_nome": "Comum",
-                "col_emoji": "⚪"
-            })
-            
-        p1_chem = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
-        cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
-        
-        sim_res = run_match_simulation(
-            p1_name = profile.get("club_name", "Meu Clube"),
-            p2_name = cpu_name,
-            p1_xi = starting_xi,
-            p2_xi = cpu_xi,
-            p1_tactic = profile.get("tactic", "padrao"),
-            p2_tactic = "padrao",
-            p1_chem = p1_chem,
-            p2_chem = cpu_chem,
-            p1_formation = profile.get("formation", "4-3-3"),
-            p2_formation = "4-3-3"
-        )
-        
-        gols_user = sim_res["p1_goals"]
-        gols_cpu = sim_res["p2_goals"]
-        
-        resultado_txt = ""
-        money_earned = 0
-        
-        if gols_user > gols_cpu:
-            money_earned = config["premio_vitoria"]
-            profile["money"] += money_earned
-            wins += 1
-            losses = 0
-            
-            subiu = False
-            msg_subida = ""
-            if config["wins_needed"] and wins >= config["wins_needed"]:
-                proxima = config["proxima"]
-                profile["liga_div"] = proxima
-                profile["liga_wins"] = 0
-                profile["liga_losses"] = 0
-                subiu = True
-                msg_subida = f"\n🎉 **UPGRADE DE DIVISÃO!** Você subiu para a **Liga {proxima}**!"
-            else:
-                profile["liga_wins"] = wins
-                profile["liga_losses"] = 0
-                
-            resultado_txt = f"🟩 **Vitória!** R$ {money_earned:,} ganhos.\n📈 Sequência de vitórias: **{wins}/{config['wins_needed'] or '—'}**.{msg_subida}"
-            
-        elif gols_user == gols_cpu:
-            money_earned = int(config["premio_vitoria"] * 0.30)
-            profile["money"] += money_earned
-            wins = 0
-            losses = 0
-            profile["liga_wins"] = 0
-            profile["liga_losses"] = 0
-            
-            resultado_txt = f"🟨 **Empate!** R$ {money_earned:,} de consolação.\nSequências resetadas."
-            
-        else:
-            money_earned = int(config["premio_vitoria"] * 0.10)
-            profile["money"] += money_earned
-            wins = 0
-            losses += 1
-            
-            caiu = False
-            msg_queda = ""
-            if config["losses_cair"] and losses >= config["losses_cair"]:
-                anterior = config["anterior"]
-                profile["liga_div"] = anterior
-                profile["liga_wins"] = 0
-                profile["liga_losses"] = 0
-                caiu = True
-                msg_queda = f"\n📉 **REBAIXAMENTO!** Você caiu para a **Liga {anterior}**!"
-            else:
-                profile["liga_wins"] = 0
-                profile["liga_losses"] = losses
-                
-            cair_info = f"({losses}/{config['losses_cair']})" if config["losses_cair"] else ""
-            resultado_txt = f"🟥 **Derrota!** R$ {money_earned:,} de consolação.\n📉 Sequência de derrotas: **{losses}** {cair_info}.{msg_queda}"
-            
-        await save_user_profile(interaction.user.id, profile)
-        
-        await self.show_simulation_pages(
-            interaction = interaction,
-            p1_name     = profile.get("club_name", "Meu Clube"),
-            p2_name     = cpu_name,
-            sim_res     = sim_res,
-            footer_msg  = resultado_txt
-        )
-
-    # ── MÓDULO 3: COPA RELÂMPAGO ──────────────────────────────────────────────
-
-    @app_commands.command(name="copa", description="Abre inscrições para uma nova Copa Relâmpago de 8 vagas com prêmio de R$ 500k.")
-    @lock_user()
-    async def copa(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        
-        doc_id = f"copa_{interaction.guild.id}"
-        record = await db_get(doc_id)
-        
-        if record and record.get("status") in ["waiting", "running"]:
-            return await interaction.followup.send("❌ Já existe uma copa ativa ou em andamento neste servidor.", ephemeral=True)
-            
-        champ = {
-            "status": "waiting",
-            "participants": [],
-            "round": 1,
-            "matches": []
-        }
-        await db_upsert(doc_id, champ)
-        
-        embed = discord.Embed(
-            title="🏆 Copa Relâmpago VLS",
-            description=f"Inscrições Abertas! Disputa mata-mata rápida por eliminatórias de 8 vagas.\n"
-                        f"💰 **Prêmio do Campeão:** R$ **500.000,00**!\n\n"
-                        f"📊 **Inscritos:** **0/8**\n\n"
-                        f"Clique no botão verde abaixo para se inscrever grátis!",
-            color=discord.Color.gold()
-        )
-        
-        view = CopaParticipateView(interaction.guild.id, self)
-        await interaction.followup.send(embed=embed, view=view)
 
     async def run_copa_simulation(self, channel, guild_id: int):
         doc_id = f"copa_{guild_id}"

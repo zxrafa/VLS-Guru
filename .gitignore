@@ -4,6 +4,9 @@
 # Bancos de dados locais
 *.db
 
+# Deploy zip (muito grande para o GitHub - fazer upload manual no Square Cloud)
+deploy.zip
+
 # Caches e arquivos temporários
 cache_cartas/
 __pycache__/

@@ -10,6 +10,10 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from formations_coordinates import FORMATIONS
 
+# Dimensões padrão do canvas
+WIDTH, HEIGHT = 1254, 1254
+CARD_W, CARD_H = 120, 168
+
 def load_card_image(card_source: str) -> Image.Image:
     if not card_source:
         return None
@@ -22,7 +26,13 @@ def load_card_image(card_source: str) -> Image.Image:
         
         if os.path.exists(cache_path):
             try:
-                return Image.open(cache_path).convert("RGBA")
+                img = Image.open(cache_path).convert("RGBA")
+                if img.size == (CARD_W, CARD_H):
+                    return img
+                # Se estiver com tamanho diferente, redimensiona
+                img = img.resize((CARD_W, CARD_H), Image.Resampling.LANCZOS)
+                img.save(cache_path, "PNG")
+                return img
             except Exception:
                 pass
                 
@@ -34,6 +44,7 @@ def load_card_image(card_source: str) -> Image.Image:
             with urllib.request.urlopen(req, timeout=5) as response:
                 img_data = response.read()
             img = Image.open(BytesIO(img_data)).convert("RGBA")
+            img = img.resize((CARD_W, CARD_H), Image.Resampling.LANCZOS)
             img.save(cache_path, "PNG")
             return img
         except Exception as e:
@@ -43,16 +54,14 @@ def load_card_image(card_source: str) -> Image.Image:
     # Se for arquivo local
     elif os.path.exists(card_source):
         try:
-            return Image.open(card_source).convert("RGBA")
+            img = Image.open(card_source).convert("RGBA")
+            if img.size != (CARD_W, CARD_H):
+                img = img.resize((CARD_W, CARD_H), Image.Resampling.LANCZOS)
+            return img
         except Exception:
             return None
             
     return None
-
-
-# Dimensões padrão do canvas
-WIDTH, HEIGHT = 1254, 1254
-CARD_W, CARD_H = 120, 168
 
 # Carregamento de fonte com fallbacks para Windows
 def get_font(size, bold=True):
@@ -190,9 +199,9 @@ def generate_team_pitch(
         if player:
             card_img = load_card_image(player.get("card"))
             if card_img:
-                # Mantém a proporção original da carta ou faz encaixe perfeito (100x140)
-                resized_card = card_img.resize((CARD_W, CARD_H), Image.Resampling.LANCZOS)
-                field_img.paste(resized_card, (x1, y1), resized_card)
+                if card_img.size != (CARD_W, CARD_H):
+                    card_img = card_img.resize((CARD_W, CARD_H), Image.Resampling.LANCZOS)
+                field_img.paste(card_img, (x1, y1), card_img)
             else:
                 # Fallback: Desenha o bloco clássico do jogador
                 color = (40, 40, 45, 240)

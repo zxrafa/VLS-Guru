@@ -4,6 +4,10 @@ VLS Guru - Cog de Equipe e Escalação
 Gerencia o time do usuário, escalações, táticas, perfis e estatísticas de jogadores.
 """
 import discord
+import asyncio
+import os
+import hashlib
+import random
 from discord.ext import commands
 from discord import app_commands
 from io import BytesIO
@@ -85,7 +89,6 @@ class TeamCog(commands.Cog, name="Equipe"):
         team_ovr = total_over // 11 if total_over > 0 else 0
 
         try:
-            import asyncio
             buffer = await asyncio.to_thread(
                 generate_team_pitch,
                 starting_xi=starting_xi,
@@ -452,10 +455,7 @@ class TeamCog(commands.Cog, name="Equipe"):
         if card_path:
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 try:
-                    import asyncio
                     from pitch_generator import load_card_image
-                    import hashlib
-                    import os
                     # Garante que a imagem seja baixada/cacheadas no disco
                     await asyncio.to_thread(load_card_image, card_path)
                     url_hash = hashlib.md5(card_path.encode("utf-8")).hexdigest()
@@ -723,7 +723,6 @@ class TimeView(discord.ui.View):
         total_over = sum(players_by_pos[pos].get("over", 0) for pos in _slots.keys() if pos in players_by_pos)
         team_ovr = total_over // 11 if total_over > 0 else 0
 
-        import asyncio
         from pitch_generator import generate_team_pitch
         buffer = await asyncio.to_thread(
             generate_team_pitch,
@@ -1343,10 +1342,7 @@ class PlayerShowDropdown(discord.ui.Select):
             if card_path:
                 if card_path.startswith("http://") or card_path.startswith("https://"):
                     try:
-                        import asyncio
                         from pitch_generator import load_card_image
-                        import hashlib
-                        import os
                         # Garante que a imagem seja baixada/cacheadas no disco
                         await asyncio.to_thread(load_card_image, card_path)
                         url_hash = hashlib.md5(card_path.encode("utf-8")).hexdigest()
@@ -1376,7 +1372,6 @@ class PlayerScaleCarouselView(discord.ui.View):
         self.current_index = 0
 
     def make_embed(self) -> tuple[discord.Embed, discord.File | None]:
-        import os
         player = self.matches[self.current_index]
         col_emoji = player.get("col_emoji", "✨")
         col_nome = player.get("col_nome", "Comum")
@@ -1450,7 +1445,6 @@ class PlayerScaleCarouselView(discord.ui.View):
         file = None
         if player.get("card"):
             card_path = player["card"]
-            import os
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 embed.set_thumbnail(url=card_path)
             elif os.path.exists(card_path):

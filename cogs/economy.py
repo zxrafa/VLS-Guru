@@ -5,6 +5,9 @@ Gerencia pacotes de cartas, mercado de transferências, olheiro e missões.
 """
 import discord
 import asyncio
+import time
+import os
+import hashlib
 from discord.ext import commands
 from discord import app_commands
 import random
@@ -219,7 +222,6 @@ class EconomyCog(commands.Cog, name="Economia"):
     @app_commands.command(name="caixa", description="Abre uma caixa misteriosa grátis a cada 8 horas.")
     @lock_user()
     async def caixa(self, interaction: discord.Interaction):
-        import time
         profile = await get_user_profile(interaction.user)
         now = time.time()
 
@@ -297,8 +299,6 @@ class EconomyCog(commands.Cog, name="Economia"):
     @app_commands.command(name="roleta", description="Gira a roleta diária da sorte para ganhar prêmios incríveis!")
     @lock_user()
     async def roleta(self, interaction: discord.Interaction):
-        import time
-        import random
         profile = await get_user_profile(interaction.user)
         now = time.time()
         
@@ -460,9 +460,6 @@ class EconomyCog(commands.Cog, name="Economia"):
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 try:
                     from pitch_generator import load_card_image
-                    import hashlib
-                    import os
-                    import asyncio
                     # Garante que a imagem seja baixada/cacheadas no disco
                     await asyncio.to_thread(load_card_image, card_path)
                     url_hash = hashlib.md5(card_path.encode("utf-8")).hexdigest()
@@ -730,9 +727,6 @@ class CustomProductSelect(discord.ui.Select):
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 try:
                     from pitch_generator import load_card_image
-                    import hashlib
-                    import os
-                    import asyncio
                     # Garante que a imagem seja baixada/cacheadas no disco
                     await asyncio.to_thread(load_card_image, card_path)
                     url_hash = hashlib.md5(card_path.encode("utf-8")).hexdigest()

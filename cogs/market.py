@@ -4,6 +4,7 @@ VLS Guru - Cog de Mercado de Transferências
 Sistema de compra (catálogo global) e venda (quick sell) de jogadores.
 """
 import discord
+import os
 from discord.ext import commands
 from discord import app_commands
 import uuid
@@ -54,7 +55,6 @@ class PlayerSellView(discord.ui.View):
         self.message = None
 
     def make_embed(self) -> tuple[discord.Embed, discord.File | None]:
-        import os
         player = self.matches[self.current_index]
         preco_quick = calculate_quick_sell(player, self.col_multipliers)
         col_emoji = player.get("col_emoji", "✨")
@@ -141,7 +141,6 @@ class PlayerSellView(discord.ui.View):
         file = None
         if player.get("card"):
             card_path = player["card"]
-            import os
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 embed.set_thumbnail(url=card_path)
             elif os.path.exists(card_path):
@@ -180,7 +179,6 @@ class GlobalBuyView(discord.ui.View):
         self.message = None
 
     def make_embed(self) -> tuple[discord.Embed, discord.File | None]:
-        import os
         player = self.matches[self.current_index]
         preco = calculate_player_price(player, self.col_multipliers)
         col_emoji = player.get("col_emoji", "✨")
@@ -285,7 +283,6 @@ class GlobalBuyView(discord.ui.View):
         file = None
         if player.get("card"):
             card_path = player["card"]
-            import os
             if card_path.startswith("http://") or card_path.startswith("https://"):
                 embed.set_thumbnail(url=card_path)
             elif os.path.exists(card_path):

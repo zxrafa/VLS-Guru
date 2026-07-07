@@ -4,6 +4,8 @@ VLS Guru - Cog de Partidas e Campeonatos (Reboot)
 Gerencia desafios PvP, apostas, treinos contra CPU, rankings e torneios mata-mata.
 """
 import discord
+import re
+import io
 from discord.ext import commands
 from discord import app_commands
 import random
@@ -208,8 +210,6 @@ class MatchesCog(commands.Cog, name="Partidas"):
         footer_msg: str,
     ):
         """Exibe a narração da partida ao vivo minuto a minuto e, no final, exibe o placar oficial com paginação."""
-        import re
-        import random
         
         logs = sim_res["narration"]
         
@@ -256,7 +256,6 @@ class MatchesCog(commands.Cog, name="Partidas"):
 
         try:
             from pitch_generator import generate_team_pitch
-            import io
             
             buf_p1 = await asyncio.to_thread(
                 generate_team_pitch,
@@ -521,22 +520,21 @@ class MatchesCog(commands.Cog, name="Partidas"):
 
         if all_players and len(all_players) >= 5:
             # Usa jogadores reais como base e varia o OVR ±10%
-            import random as _rnd
             cpu_xi = []
             pool = all_players * 3  # replica para ter jogadores suficientes
-            _rnd.shuffle(pool)
+            random.shuffle(pool)
             used_ids = set()
             for i, cpu_pos in enumerate(cpu_positions):
                 candidates = [p for p in pool if p.get("id") not in used_ids]
                 if candidates:
-                    base_player = _rnd.choice(candidates[:15])
+                    base_player = random.choice(candidates[:15])
                     used_ids.add(base_player.get("id"))
                 else:
-                    base_player = _rnd.choice(pool)
+                    base_player = random.choice(pool)
 
                 # OVR do adversario varia dentro de +-10% do avg_ovr do jogador
                 variation = int(avg_ovr * 0.10)
-                cpu_ovr = max(50, min(99, avg_ovr + _rnd.randint(-variation, variation)))
+                cpu_ovr = max(50, min(99, avg_ovr + random.randint(-variation, variation)))
 
                 # Atributos derivados do OVR ajustado
                 base_stat = max(50, cpu_ovr - 5)
@@ -892,11 +890,11 @@ class MatchesCog(commands.Cog, name="Partidas"):
                     p1_xi     = p1_prof["starting_xi"],
                     p2_xi     = p2_prof["starting_xi"],
                     p1_tactic = p1_prof.get("tactic", "padrao"),
-                    p2_tactic = p2_prof.get("tactic", "padrao"),
+                    p2_tactic = "padrao",
                     p1_chem   = p1_chem,
                     p2_chem   = p2_chem,
                     p1_formation = p1_prof.get("formation", "4-3-3"),
-                    p2_formation = p2_prof.get("formation", "4-3-3")
+                    p2_formation = "4-3-3"
                 )
 
                 m["p1_goals"] = sim["p1_goals"]
@@ -1015,11 +1013,11 @@ class ChallengeResponseView(discord.ui.View):
             p1_xi     = p1_xi,
             p2_xi     = p2_xi,
             p1_tactic = p1_profile.get("tactic", "padrao"),
-            p2_tactic = p2_profile.get("tactic", "padrao"),
+            p2_tactic = "padrao",
             p1_chem   = p1_chem,
             p2_chem   = p2_chem,
             p1_formation = p1_profile.get("formation", "4-3-3"),
-            p2_formation = p2_profile.get("formation", "4-3-3")
+            p2_formation = "4-3-3"
         )
 
         wager_msg = await self.cog.process_match_results(interaction, self.challenger, self.target, sim_res, self.wager)
@@ -1157,9 +1155,8 @@ class CampeonatoAdminView(discord.ui.View):
         if len(champ.get("participants", [])) < 2:
             return await interaction.response.send_message("❌ São necessários pelo menos 2 participantes.", ephemeral=True)
 
-        import random as _rnd
         participants = champ["participants"]
-        _rnd.shuffle(participants)
+        random.shuffle(participants)
 
         bye_player = None
         if len(participants) % 2 != 0:
@@ -1449,7 +1446,6 @@ class CampeonatoAdminView(discord.ui.View):
         await interaction.followup.send(embed=embed, view=view)
 
     async def run_copa_simulation(self, channel, guild_id: int):
-        import random
         doc_id = f"copa_{guild_id}"
         record = await db_get(doc_id)
         if not record:
@@ -1735,7 +1731,6 @@ class PenaltiTreinoView(discord.ui.View):
         return f"👤 **Você:** {fmt(self.chutes_usuario)}\n🤖 **CPU:** {fmt(self.chutes_cpu)}"
 
     async def process_turn(self, interaction: discord.Interaction):
-        import random
         cpu_choice = random.choice(["esquerda", "centro", "direita"])
         
         if self.fase == "chutar":

@@ -9,9 +9,10 @@ import aiohttp
 from discord.ext import commands
 from datetime import datetime
 
+import os
 from database import db_get, db_upsert
 
-GEMINI_API_KEY = "AIzaSyAlocvbGnhzheJ59KPXN_8KbSZ7W5ltpXM"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CHAT_CHANNEL_ID = 1524177774682837022
 
 
@@ -42,6 +43,10 @@ class ChatCog(commands.Cog, name="Chat"):
         # Filtro básico contra risadas puras e spams contínuos kkkk / ahaha / rsrs
         lower_content = content.lower()
         if all(c in "k" for c in lower_content) or all(c in "ha" for c in lower_content) or all(c in "rs" for c in lower_content):
+            return
+
+        if not GEMINI_API_KEY:
+            print("[Chat] Erro: GEMINI_API_KEY não configurada no ambiente/env.")
             return
 
         # URL do endpoint do Gemini

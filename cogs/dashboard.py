@@ -979,7 +979,9 @@ class EditarJogadorModal(VLSModal, title="Editar Jogador"):
 
 async def _delete_player_everywhere(player_id: str, player_name: str):
     """Remove o jogador do catálogo e de todos os inventários/XIs de usuários."""
-    await db_delete(player_id)
+    db_id = player_id if player_id.startswith("player_") else f"player_{player_id}"
+    clean_id = player_id.replace("player_", "")
+    await db_delete(db_id)
     users = await get_all_users()
     for u_data in users:
         uid = u_data.get("user_id")
@@ -987,12 +989,12 @@ async def _delete_player_everywhere(player_id: str, player_name: str):
             continue
         inventory = u_data.get("inventory", [])
         # inventory items têm "id" copiado do catálogo
-        new_inv = [item for item in inventory if item.get("id") != player_id]
+        new_inv = [item for item in inventory if item.get("id") != clean_id]
         if len(new_inv) != len(inventory):
             u_data["inventory"] = new_inv
             u_data["starting_xi"] = [
                 p for p in u_data.get("starting_xi", [])
-                if p.get("id") != player_id
+                if p.get("id") != clean_id
             ]
             await save_user_profile(uid, u_data)
 

@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VLS League - Card TXT Builder</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #090611;
+            --bg-card: rgba(18, 11, 30, 0.65);
+            --primary: #ff007f;
+            --secondary: #00ffff;
+            --text-main: #f3f0f7;
+            --text-muted: #a39cb4;
+            --border-glow: rgba(255, 0, 127, 0.2);
+            --border-normal: rgba(255, 255, 255, 0.08);
+            --neon-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+            --cyan-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 0%, #1e1135 0%, var(--bg-dark) 70%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Header Premium */
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-normal);
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-logo img {
+            height: 48px;
+            border-radius: 8px;
+            border: 2px solid var(--primary);
+            box-shadow: var(--neon-shadow);
+        }
+
+        .header-logo h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-logo span {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            letter-spacing: 0px;
+        }
+
+        .header-badge {
+            background: rgba(0, 255, 255, 0.1);
+            color: var(--secondary);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 0.4rem 1rem;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.05);
+        }
+
+        /* Layout Grid */
+        .workspace {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border-normal);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border-bottom: 1px solid var(--border-normal);
+            padding-bottom: 0.75rem;
+            color: var(--text-main);
+        }
+
+        .panel-title i {
+            color: var(--primary);
+            text-shadow: var(--neon-shadow);
+        }
+
+        /* Inputs */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.25rem;
+        }
+
+        @media (max-width: 500px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        input[type="text"], input[type="number"], select {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-normal);
+            color: var(--text-main);
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.15);
+        }
+
+        /* Sliders de Atributos */
+        .attributes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .attr-slider-group {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .attr-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .attr-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .attr-value {
+            font-size: 1rem;
+            font-weight: 800;
+            color: var(--secondary);
+            text-shadow: 0 0 5px rgba(0, 255, 255, 0.2);
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--secondary);
+            cursor: pointer;
+            box-shadow: var(--cyan-shadow);
+            transition: transform 0.1s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        /* Seletores Curtos (Estrelas) */
+        .stars-group {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            padding: 0.75rem 1rem;
+            border-radius: 12px;
+        }
+
+        .stars-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+        }
+
+        .stars-input {
+            display: flex;
+            gap: 0.4rem;
+        }
+
+        .star-btn {
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .star-btn.active {
+            color: #ffd700;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Playstyles Chips */
+        .playstyles-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .playstyles-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            max-height: 140px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.15);
+            border: 1px solid var(--border-normal);
+            border-radius: 10px;
+        }
+
+        .ps-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-normal);
+            padding: 0.35rem 0.75rem;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .ps-chip:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .ps-chip.active {
+            background: rgba(255, 0, 127, 0.15);
+            border-color: var(--primary);
+            color: var(--text-main);
+            box-shadow: 0 0 10px rgba(255, 0, 127, 0.2);
+        }
+
+        /* Botões */
+        .btn {
+            background: linear-gradient(45deg, var(--primary), #d0006b);
+            color: white;
+            border: none;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            transition: all 0.3s ease;
+            box-shadow: var(--neon-shadow);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px rgba(255, 0, 127, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn.secondary-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-normal);
+            box-shadow: none;
+            color: var(--text-main);
+        }
+
+        .btn.secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--text-muted);
+            box-shadow: none;
+        }
+
+        /* Output Card */
+        .output-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-normal);
+            border-radius: 20px;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            grid-column: 1 / -1;
+        }
+
+        .output-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .textarea-container {
+            position: relative;
+            width: 100%;
+        }
+
+        textarea {
+            width: 100%;
+            height: 250px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-normal);
+            border-radius: 12px;
+            padding: 1.25rem;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            color: var(--secondary);
+            resize: none;
+            outline: none;
+            transition: border-color 0.3s ease;
+            line-height: 1.5;
+        }
+
+        textarea:focus {
+            border-color: var(--secondary);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+
+        .btn-copy {
+            background: var(--secondary);
+            color: #000;
+            box-shadow: var(--cyan-shadow);
+        }
+
+        .btn-copy:hover {
+            box-shadow: 0 0 25px rgba(0, 255, 255, 0.6);
+        }
+
+        .btn-actions-row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        /* Toast de Cópia */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(0, 255, 255, 0.9);
+            color: #000;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: var(--cyan-shadow);
+            transform: translateY(150%);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .help-note {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid var(--primary);
+            padding: 0.75rem 1rem;
+            border-radius: 0 8px 8px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-logo">
+            <img src="https://i.ibb.co/bMHVPgbd/54d7bc1101119ff3a1643b475250cd0b.webp" alt="VLS Logo">
+            <div>
+                <h1>TXT Builder Card</h1>
+                <span>Gerador de Importação em Massa — VLS League</span>
+            </div>
+        </div>
+        <div class="header-badge">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Offline Helper</span>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <!-- Painel de Dados Básicos -->
+        <div class="panel">
+            <div class="panel-title">
+                <i class="fa-solid fa-id-card"></i>
+                <h2>Dados Gerais</h2>
+            </div>
+            
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="p-name">Nome do Jogador</label>
+                    <input type="text" id="p-name" placeholder="Ex: Cristiano Ronaldo" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="p-overall">Overall (0-99)</label>
+                    <input type="number" id="p-overall" min="1" max="99" value="85" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="p-pos">Posição</label>
+                    <select id="p-pos">
+                        <option value="ST" selected>ST (Centroavante)</option>
+                        <option value="CF">CF (Segundo Atacante)</option>
+                        <option value="LW">LW (Ponta Esquerda)</option>
+                        <option value="RW">RW (Ponta Direita)</option>
+                        <option value="CAM">CAM (Meia Armador)</option>
+                        <option value="CM">CM (Meio-Campista)</option>
+                        <option value="LM">LM (Meia Esquerda)</option>
+                        <option value="RM">RM (Meia Direita)</option>
+                        <option value="CDM">CDM (Volante)</option>
+                        <option value="CB">CB (Zagueiro)</option>
+                        <option value="LB">LB (Lateral Esquerdo)</option>
+                        <option value="RB">RB (Lateral Direito)</option>
+                        <option value="LWB">LWB (Ala Esquerdo)</option>
+                        <option value="RWB">RWB (Ala Direito)</option>
+                        <option value="GK">GK (Goleiro)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="p-col">Coleção (Slug)</label>
+                    <input type="text" id="p-col" value="base" placeholder="Ex: base, comum, premiados" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="p-nation">Nacionalidade</label>
+                    <input type="text" id="p-nation" placeholder="Ex: Brasileiro" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="p-club">Clube</label>
+                    <input type="text" id="p-club" placeholder="Ex: Al-Nassr" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="p-photo">Link da Foto (Opcional)</label>
+                    <input type="text" id="p-photo" placeholder="Ex: https://i.ibb.co/foto.png">
+                </div>
+            </div>
+            
+            <div class="help-note">
+                <i class="fa-solid fa-circle-info"></i>
+                Se quiser fazer a importação <strong>Simplificada</strong>, basta preencher estes dados gerais e clicar em "Gerar Linha Simplificada".
+            </div>
+
+            <div class="btn-actions-row">
+                <button class="btn" id="btn-add-simple" style="flex: 1; background: linear-gradient(45deg, #a800d0, #ff007f);">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i> Simplificada
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel de Dados Técnicos / Completos -->
+        <div class="panel">
+            <div class="panel-title">
+                <i class="fa-solid fa-sliders"></i>
+                <h2>Dados Técnicos (Modo Completo)</h2>
+            </div>
+
+            <!-- Grid de Atributos -->
+            <div class="attributes-grid">
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr1">PAC</span>
+                        <span class="attr-value" id="val-attr1">75</span>
+                    </div>
+                    <input type="range" id="attr1" min="1" max="99" value="75">
+                </div>
+
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr2">SHO</span>
+                        <span class="attr-value" id="val-attr2">75</span>
+                    </div>
+                    <input type="range" id="attr2" min="1" max="99" value="75">
+                </div>
+
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr3">PAS</span>
+                        <span class="attr-value" id="val-attr3">75</span>
+                    </div>
+                    <input type="range" id="attr3" min="1" max="99" value="75">
+                </div>
+
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr4">DRI</span>
+                        <span class="attr-value" id="val-attr4">75</span>
+                    </div>
+                    <input type="range" id="attr4" min="1" max="99" value="75">
+                </div>
+
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr5">DEF</span>
+                        <span class="attr-value" id="val-attr5">75</span>
+                    </div>
+                    <input type="range" id="attr5" min="1" max="99" value="75">
+                </div>
+
+                <div class="attr-slider-group">
+                    <div class="attr-header">
+                        <span class="attr-label" id="lbl-attr6">PHY</span>
+                        <span class="attr-value" id="val-attr6">75</span>
+                    </div>
+                    <input type="range" id="attr6" min="1" max="99" value="75">
+                </div>
+            </div>
+
+            <!-- Perna Ruim / Fintas -->
+            <div class="form-grid" style="margin-top: 0.5rem;">
+                <div class="stars-group">
+                    <span class="stars-label">Perna Ruim</span>
+                    <div class="stars-input" id="wf-stars">
+                        <button class="star-btn active" data-val="1"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn active" data-val="2"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn active" data-val="3"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn" data-val="4"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn" data-val="5"><i class="fa-solid fa-star"></i></button>
+                    </div>
+                </div>
+
+                <div class="stars-group">
+                    <span class="stars-label">Fintas (SM)</span>
+                    <div class="stars-input" id="sm-stars">
+                        <button class="star-btn active" data-val="1"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn active" data-val="2"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn active" data-val="3"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn" data-val="4"><i class="fa-solid fa-star"></i></button>
+                        <button class="star-btn" data-val="5"><i class="fa-solid fa-star"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Playstyles selection -->
+            <div class="playstyles-area">
+                <label>PlayStyles (Chips)</label>
+                <div class="playstyles-container" id="ps-container">
+                    <div class="ps-chip" data-id="tecnica">💡 Técnica</div>
+                    <div class="ps-chip" data-id="trivela">☄️ Trivela</div>
+                    <div class="ps-chip" data-id="rapid">⚡ Veloz</div>
+                    <div class="ps-chip" data-id="anjo">👼 Anjo</div>
+                    <div class="ps-chip" data-id="arremesso_especial">🤾 Arremesso Especial</div>
+                    <div class="ps-chip" data-id="encaixada">🧤 Encaixada</div>
+                    <div class="ps-chip" data-id="acrobata">🤸 Acrobata</div>
+                    <div class="ps-chip" data-id="superchute">🚀 Superchute</div>
+                    <div class="ps-chip" data-id="malvadeza">🎭 Malvadeza</div>
+                    <div class="ps-chip" data-id="perde_pressiona">🛡️ Pressiona</div>
+                    <div class="ps-chip" data-id="ima_no_pe">🧲 Ímã no Pé</div>
+                </div>
+            </div>
+
+            <button class="btn" id="btn-add-complete">
+                <i class="fa-solid fa-plus"></i> Adicionar Linha Completa
+            </button>
+        </div>
+
+        <!-- Área do Resultado do TXT -->
+        <div class="output-panel">
+            <div class="output-actions">
+                <div class="panel-title" style="border: none; padding: 0;">
+                    <i class="fa-solid fa-file-lines"></i>
+                    <h2>Conteúdo do Arquivo jogadores.txt</h2>
+                </div>
+                <div class="btn-actions-row">
+                    <button class="btn secondary-btn" id="btn-clear" style="padding: 0.5rem 1rem;">
+                        <i class="fa-solid fa-trash-can"></i> Limpar
+                    </button>
+                    <button class="btn btn-copy" id="btn-copy" style="padding: 0.5rem 1.25rem;">
+                        <i class="fa-solid fa-copy"></i> Copiar Tudo
+                    </button>
+                </div>
+            </div>
+
+            <div class="textarea-container">
+                <textarea id="output-text" readonly placeholder="# Insira seus jogadores aqui. Cada linha gerada acumulará neste bloco..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast">
+    <i class="fa-solid fa-circle-check"></i>
+    <span>Copiado com sucesso!</span>
+</div>
+
+<script>
+    // Configurações de Atributos de acordo com a Posição
+    const posSelect = document.getElementById('p-pos');
+    const lblAttr1 = document.getElementById('lbl-attr1');
+    const lblAttr2 = document.getElementById('lbl-attr2');
+    const lblAttr3 = document.getElementById('lbl-attr3');
+    const lblAttr4 = document.getElementById('lbl-attr4');
+    const lblAttr5 = document.getElementById('lbl-attr5');
+    const lblAttr6 = document.getElementById('lbl-attr6');
+
+    posSelect.addEventListener('change', () => {
+        const isGK = posSelect.value === 'GK';
+        if (isGK) {
+            lblAttr1.textContent = 'DIV';
+            lblAttr2.textContent = 'HAN';
+            lblAttr3.textContent = 'KIC';
+            lblAttr4.textContent = 'REF';
+            lblAttr5.textContent = 'SPD';
+            lblAttr6.textContent = 'POS';
+        } else {
+            lblAttr1.textContent = 'PAC';
+            lblAttr2.textContent = 'SHO';
+            lblAttr3.textContent = 'PAS';
+            lblAttr4.textContent = 'DRI';
+            lblAttr5.textContent = 'DEF';
+            lblAttr6.textContent = 'PHY';
+        }
+    });
+
+    // Slider Listeners para sincronizar texto
+    const sliders = ['attr1', 'attr2', 'attr3', 'attr4', 'attr5', 'attr6'];
+    sliders.forEach(id => {
+        const slider = document.getElementById(id);
+        const display = document.getElementById(`val-${id}`);
+        slider.addEventListener('input', () => {
+            display.textContent = slider.value;
+        });
+    });
+
+    // Seletores de Estrelas (Perna Ruim / Fintas)
+    let weakFootValue = 3;
+    let skillMovesValue = 3;
+
+    function setupStars(containerId, callback) {
+        const container = document.getElementById(containerId);
+        const buttons = container.querySelectorAll('.star-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const val = parseInt(btn.getAttribute('data-val'));
+                callback(val);
+                buttons.forEach(b => {
+                    const bVal = parseInt(b.getAttribute('data-val'));
+                    if (bVal <= val) {
+                        b.classList.add('active');
+                    } else {
+                        b.classList.remove('active');
+                    }
+                });
+            });
+        });
+    }
+
+    setupStars('wf-stars', (val) => { weakFootValue = val; });
+    setupStars('sm-stars', (val) => { skillMovesValue = val; });
+
+    // Playstyles Selection (Chips toggle)
+    const chips = document.querySelectorAll('.ps-chip');
+    chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+            chip.classList.toggle('active');
+        });
+    });
+
+    function getSelectedPlaystyles() {
+        const activeChips = document.querySelectorAll('.ps-chip.active');
+        return Array.from(activeChips).map(c => c.getAttribute('data-id')).join(',');
+    }
+
+    // Geradores e Acumulador de Textarea
+    const outputText = document.getElementById('output-text');
+    const pName = document.getElementById('p-name');
+    const pOverall = document.getElementById('p-overall');
+    const pCol = document.getElementById('p-col');
+    const pNation = document.getElementById('p-nation');
+    const pClub = document.getElementById('p-club');
+    const pPhoto = document.getElementById('p-photo');
+
+    function appendLine(line) {
+        if (outputText.value) {
+            outputText.value += '\n' + line;
+        } else {
+            outputText.value = line;
+        }
+    }
+
+    // Adicionar Simplificado
+    document.getElementById('btn-add-simple').addEventListener('click', () => {
+        const name = pName.value.trim();
+        const over = pOverall.value;
+        const pos = posSelect.value;
+        const col = pCol.value.trim().toLowerCase();
+        const nation = pNation.value.trim();
+        const club = pClub.value.trim();
+        const photo = pPhoto.value.trim();
+
+        if (!name || !nation || !club) {
+            alert('Por favor, preencha Nome, Nacionalidade e Clube!');
+            return;
+        }
+
+        let line = `${name} | ${over} | ${pos} | ${col} | ${nation} | ${club}`;
+        if (photo) {
+            line += ` | ${photo}`;
+        }
+
+        appendLine(line);
+        pName.value = ''; // Limpa nome para o próximo
+        pName.focus();
+    });
+
+    // Adicionar Completo
+    document.getElementById('btn-add-complete').addEventListener('click', () => {
+        const name = pName.value.trim();
+        const over = pOverall.value;
+        const pos = posSelect.value;
+        const col = pCol.value.trim().toLowerCase();
+        const nation = pNation.value.trim();
+        const club = pClub.value.trim();
+        const photo = pPhoto.value.trim();
+
+        if (!name || !nation || !club) {
+            alert('Por favor, preencha Nome, Nacionalidade e Clube nos Dados Gerais!');
+            return;
+        }
+
+        const a1 = document.getElementById('attr1').value;
+        const a2 = document.getElementById('attr2').value;
+        const a3 = document.getElementById('attr3').value;
+        const a4 = document.getElementById('attr4').value;
+        const a5 = document.getElementById('attr5').value;
+        const a6 = document.getElementById('attr6').value;
+        
+        const playstyles = getSelectedPlaystyles();
+
+        let line = `${name} | ${over} | ${pos} | ${col} | ${nation} | ${club} | ${a1} | ${a2} | ${a3} | ${a4} | ${a5} | ${a6} | ${weakFootValue} | ${skillMovesValue}`;
+        
+        // Adiciona playstyles e foto se houverem, ou preenche com pipe para manter o formato completo
+        if (playstyles || photo) {
+            line += ` | ${playstyles}`;
+        }
+        if (photo) {
+            line += ` | ${photo}`;
+        }
+
+        appendLine(line);
+        pName.value = ''; // Limpa nome
+        // Desativa playstyles
+        chips.forEach(c => c.classList.remove('active'));
+        pName.focus();
+    });
+
+    // Limpar Área
+    document.getElementById('btn-clear').addEventListener('click', () => {
+        if (confirm('Deseja mesmo limpar a lista gerada?')) {
+            outputText.value = '';
+        }
+    });
+
+    // Copiar Texto
+    const toast = document.getElementById('toast');
+    document.getElementById('btn-copy').addEventListener('click', () => {
+        if (!outputText.value) return;
+        
+        navigator.clipboard.writeText(outputText.value).then(() => {
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }).catch(err => {
+            // Fallback se navigator.clipboard falhar
+            outputText.select();
+            document.execCommand('copy');
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        });
+    });
+</script>
+
+</body>
+</html>

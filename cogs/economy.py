@@ -4,6 +4,7 @@ VLS Guru - Cog de Economia e Progresso
 Gerencia pacotes de cartas, mercado de transferências, olheiro e missões.
 """
 import discord
+import asyncio
 from discord.ext import commands
 from discord import app_commands
 import random

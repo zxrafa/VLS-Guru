@@ -66,7 +66,7 @@ class PlayerSellView(discord.ui.View):
         embed.add_field(name="Jogador", value=f"{col_emoji} **{player['name']}**", inline=True)
         embed.add_field(name="Posição / Rated", value=f"⚽ {player.get('pos','?')}  •  ⭐ {player.get('over','?')}", inline=True)
         embed.add_field(name="Coleção", value=col_nome, inline=True)
-        embed.add_field(name="Valor de Venda (15%)", value=f"R$ **{preco_quick:,}**", inline=False)
+        embed.add_field(name="Valor de Venda (5%)", value=f"R$ **{preco_quick:,}**", inline=False)
         
         file = None
         if player.get("card"):
@@ -360,7 +360,7 @@ class MarketCog(commands.Cog, name="Mercado"):
         total_pages = view.total_pages
         await interaction.response.send_message(
             f"🗑️ **Venda em Massa** — Selecione os jogadores que deseja vender.\n"
-            f"O valor de cada um é **15%** do preço de mercado.\n"
+            f"O valor de cada um é **5%** do preço de mercado.\n"
             f"*(Página 1/{total_pages} • {len(inventory)} jogadores no elenco)*",
             view=view,
             ephemeral=True,

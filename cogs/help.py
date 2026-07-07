@@ -26,7 +26,7 @@ HELP_CATEGORIES = [
         "name": "🏪 Mercado de Transferências",
         "emoji": "🏪",
         "commands": [
-            ("`/vender`", "Vende um jogador do seu inventário diretamente para a CPU (Quick Sell por 50%)."),
+            ("`/vender`", "Vende um jogador do seu inventário diretamente para a CPU (Quick Sell por 5%)."),
             ("`/mercado`", "Lista todos os jogadores disponíveis no catálogo global de transferências."),
             ("`/contratar`", "Pesquisa e contrata um jogador do catálogo global."),
         ]

@@ -882,7 +882,7 @@ class ClaimView(discord.ui.View):
         super().__init__(timeout=60)
         self.user = user
         self.player = player
-        self.preco_venda = int(preco * 0.50)
+        self.preco_venda = int(preco * 0.05)
         self.processed = False
         self.confirming_sale = False
         self.message = None

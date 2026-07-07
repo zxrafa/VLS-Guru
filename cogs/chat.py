@@ -50,7 +50,7 @@ class ChatCog(commands.Cog, name="Chat"):
             return
 
         # URL do endpoint do Gemini
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
         
         system_instruction = (
             "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "

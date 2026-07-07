@@ -458,20 +458,26 @@ function renderChampionshipsList() {
     listContainer.innerHTML = allChampionships.map(c => {
         const logo = c.logo_url || "https://i.ibb.co/C5B7BBjS/image.png";
         return `
-            <div class="col-card glass">
-                <div class="col-card-header">
-                    <img src="${logo}" alt="${c.nome}" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.05);" onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'">
-                    <div style="flex: 1; margin-left: 0.75rem;">
-                        <h4 style="font-weight:600; font-size:1.05rem;">${c.nome}</h4>
-                        <span class="badge ${c.ativo ? 'badge-success' : 'badge-danger'}" style="font-size:0.7rem; padding: 0.15rem 0.5rem; border-radius: 20px; display: inline-block; margin-top: 0.25rem;">
-                            ${c.ativo ? 'Ativo' : 'Inativo'}
-                        </span>
+            <div class="col-card glass" style="display: flex; flex-direction: column; gap: 0.85rem; padding: 1rem; border-radius: 12px; margin-bottom: 0px;">
+                <div class="col-card-header" style="display: flex; align-items: center; justify-content: space-between; border-bottom: none; padding-bottom: 0; width: 100%;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <img src="${logo}" alt="${c.nome}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: rgba(255,255,255,0.05);" onerror="this.src='https://i.ibb.co/C5B7BBjS/image.png'">
+                        <div>
+                            <h4 style="font-weight:600; font-size:1.05rem; color: #fff; margin: 0;">${c.nome}</h4>
+                            <span class="badge ${c.ativo ? 'badge-success' : 'badge-danger'}" style="font-size:0.65rem; padding: 0.15rem 0.5rem; border-radius: 20px; display: inline-block; margin-top: 0.25rem;">
+                                ${c.ativo ? 'Ativo' : 'Inativo'}
+                            </span>
+                        </div>
                     </div>
-                    <div class="col-card-actions">
-                        <button class="btn-icon" title="Gerenciar Times" onclick="openChampionshipTeamsModal('${c.id}', '${c.nome}')" style="background: rgba(0, 255, 255, 0.08); color: var(--color-cyan); margin-right: 0.25rem;"><i class="fa-solid fa-shield-halved"></i></button>
-                        <button class="btn-icon btn-edit-col" onclick="editChampionship('${c.id}')"><i class="fa-solid fa-pen-to-square"></i></button>
-                        <button class="btn-icon btn-delete-col" onclick="deleteChampionship('${c.id}', '${c.nome}')"><i class="fa-solid fa-trash"></i></button>
+                    <div class="col-card-actions" style="display: flex; gap: 0.35rem;">
+                        <button class="btn-icon btn-edit-col" onclick="editChampionship('${c.id}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button class="btn-icon btn-delete-col" onclick="deleteChampionship('${c.id}', '${c.nome}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
                     </div>
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 0.75rem; width: 100%;">
+                    <button class="btn btn-primary" onclick="openChampionshipTeamsModal('${c.id}', '${c.nome}')" style="background: rgba(0, 255, 255, 0.1); border: 1px solid rgba(0, 255, 255, 0.25); color: var(--color-cyan); font-weight: 700; width: 100%; justify-content: center; font-size: 0.75rem; padding: 0.45rem 1rem; border-radius: 8px; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; transition: all 0.2s ease;">
+                        <i class="fa-solid fa-shield-halved" style="font-size: 0.85rem;"></i> Gerenciar Times
+                    </button>
                 </div>
             </div>
         `;

@@ -435,6 +435,14 @@
         .btn-actions-row {
             display: flex;
             gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* Drop Zone dragover */
+        #drop-zone.dragover {
+            background: rgba(0, 255, 255, 0.08);
+            border-color: var(--secondary) !important;
+            box-shadow: var(--cyan-shadow);
         }
 
         /* Toast de Cópia */
@@ -552,9 +560,6 @@
                         </button>
                         <input type="file" id="p-photo-file" accept="image/*" style="display: none;">
                     </div>
-                    <span id="upload-status" style="font-size: 0.85rem; color: var(--secondary); display: none; margin-top: 0.25rem; font-weight: 600;">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Enviando para o ImgBB...
-                    </span>
                 </div>
             </div>
             
@@ -690,12 +695,43 @@
                     <button class="btn btn-copy" id="btn-copy" style="padding: 0.5rem 1.25rem;">
                         <i class="fa-solid fa-copy"></i> Copiar Tudo
                     </button>
+                    <button class="btn" id="btn-export" style="padding: 0.5rem 1.25rem; background: linear-gradient(45deg, #00c6ff, #0072ff); box-shadow: 0 0 15px rgba(0, 198, 255, 0.3);">
+                        <i class="fa-solid fa-file-arrow-down"></i> Exportar TXT
+                    </button>
                 </div>
             </div>
 
             <div class="textarea-container">
                 <textarea id="output-text" readonly placeholder="# Insira seus jogadores aqui. Cada linha gerada acumulará neste bloco..."></textarea>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Upload Premium (ImgBB) -->
+<div id="upload-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(9, 6, 17, 0.85); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: all 0.3s ease;">
+    <div class="panel" style="width: 90%; max-width: 500px; padding: 2rem; border-color: var(--primary); box-shadow: var(--neon-shadow); position: relative; transform: scale(0.9); transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+        <button id="btn-close-upload-modal" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;"><i class="fa-solid fa-xmark"></i></button>
+        <div class="panel-title" style="margin-bottom: 1rem; border: none;">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <h2>Hospedar no ImgBB</h2>
+        </div>
+        
+        <div id="drop-zone" style="border: 2px dashed rgba(0, 255, 255, 0.3); border-radius: 12px; height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; cursor: pointer; background: rgba(255, 255, 255, 0.02); transition: all 0.3s ease; text-align: center; padding: 1.5rem;">
+            <i class="fa-solid fa-images" style="font-size: 3rem; color: var(--secondary); text-shadow: var(--cyan-shadow); pointer-events: none;"></i>
+            <div style="pointer-events: none;">
+                <p style="font-size: 0.95rem; font-weight: 600;">Arraste & Solte uma imagem aqui</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Ou clique para selecionar um arquivo</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 0.75rem;">
+            <p style="font-size: 0.85rem; color: var(--text-muted);">💡 Dica: Você também pode colar uma imagem diretamente com <strong>Ctrl + V</strong>!</p>
+        </div>
+        
+        <div id="modal-upload-status" style="display: none; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 1.5rem; font-weight: 600; color: var(--secondary);">
+            <i class="fa-solid fa-spinner fa-spin fa-lg"></i>
+            <span id="modal-status-text">Enviando imagem...</span>
         </div>
     </div>
 </div>
@@ -783,7 +819,7 @@
         return Array.from(activeChips).map(c => c.getAttribute('data-id')).join(',');
     }
 
-    // Geradores e Acumulador de Textarea
+    // Elementos da interface
     const outputText = document.getElementById('output-text');
     const pName = document.getElementById('p-name');
     const pOverall = document.getElementById('p-overall');
@@ -791,26 +827,96 @@
     const pNation = document.getElementById('p-nation');
     const pClub = document.getElementById('p-club');
     const pPhoto = document.getElementById('p-photo');
+    
+    // Elementos de Upload & Modal
     const pPhotoFile = document.getElementById('p-photo-file');
     const btnUploadTrigger = document.getElementById('btn-upload-trigger');
-    const uploadStatus = document.getElementById('upload-status');
+    const uploadModal = document.getElementById('upload-modal');
+    const btnCloseUploadModal = document.getElementById('btn-close-upload-modal');
+    const dropZone = document.getElementById('drop-zone');
+    const modalUploadStatus = document.getElementById('modal-upload-status');
+    const modalStatusText = document.getElementById('modal-status-text');
     const toast = document.getElementById('toast');
     const toastText = document.getElementById('toast-text');
 
-    // Trigger de Upload do Input File
-    btnUploadTrigger.addEventListener('click', () => {
+    // --- CONTROLES DO MODAL ---
+    function openModal() {
+        uploadModal.style.display = 'flex';
+        setTimeout(() => {
+            uploadModal.style.opacity = '1';
+            uploadModal.querySelector('.panel').style.transform = 'scale(1)';
+        }, 10);
+    }
+
+    function closeModal() {
+        uploadModal.style.opacity = '0';
+        uploadModal.querySelector('.panel').style.transform = 'scale(0.9)';
+        setTimeout(() => {
+            uploadModal.style.display = 'none';
+            modalUploadStatus.style.display = 'none';
+        }, 300);
+    }
+
+    btnUploadTrigger.addEventListener('click', openModal);
+    btnCloseUploadModal.addEventListener('click', closeModal);
+    uploadModal.addEventListener('click', (e) => {
+        if (e.target === uploadModal) closeModal();
+    });
+
+    // Clique na dropzone para abrir seletor
+    dropZone.addEventListener('click', () => {
         pPhotoFile.click();
     });
 
-    // Upload na API do ImgBB ao selecionar arquivo
-    pPhotoFile.addEventListener('change', async () => {
-        const file = pPhotoFile.files[0];
-        if (!file) return;
+    pPhotoFile.addEventListener('change', () => {
+        if (pPhotoFile.files.length > 0) {
+            handleImageUpload(pPhotoFile.files[0]);
+        }
+    });
 
-        btnUploadTrigger.disabled = true;
-        uploadStatus.style.display = 'block';
-        uploadStatus.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando para o ImgBB...';
+    // --- DRAG AND DROP ---
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        }, false);
+    });
 
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+        }, false);
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0 && files[0].type.startsWith('image/')) {
+            handleImageUpload(files[0]);
+        }
+    });
+
+    // --- CONTROLE DE COLAGEM (CTRL+V) ---
+    document.addEventListener('paste', (e) => {
+        // Apenas se o modal de upload estiver visível
+        if (uploadModal.style.display !== 'flex') return;
+        
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (const item of items) {
+            if (item.type.indexOf('image') === 0) {
+                const blob = item.getAsFile();
+                handleImageUpload(blob);
+                break;
+            }
+        }
+    });
+
+    // --- FUNÇÃO DE PROCESSAR UPLOAD (IMGBB) ---
+    async function handleImageUpload(file) {
+        modalUploadStatus.style.display = 'flex';
+        modalStatusText.textContent = "Hospedando imagem no ImgBB...";
+        
         const apiKey = "617c898158c94ac25ddaf2491ee7d0b4";
         const formData = new FormData();
         formData.append("image", file);
@@ -821,33 +927,30 @@
                 body: formData
             });
 
-            if (!response.ok) throw new Error("Falha no upload");
+            if (!response.ok) throw new Error("Erro de resposta do ImgBB");
 
             const result = await response.json();
             const imageUrl = result.data.url;
 
             pPhoto.value = imageUrl;
             
-            // Sucesso toast
-            toastText.textContent = "Imagem hospedada com sucesso!";
+            // Fecha o modal e mostra toast
+            closeModal();
+            toastText.textContent = "Imagem enviada com sucesso!";
             toast.classList.add('show');
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 2000);
-
-            uploadStatus.innerHTML = '<i class="fa-solid fa-circle-check"></i> Concluído!';
-            setTimeout(() => { uploadStatus.style.display = 'none'; }, 3000);
+            setTimeout(() => toast.classList.remove('show'), 2500);
 
         } catch (error) {
             console.error(error);
-            uploadStatus.innerHTML = '<i class="fa-solid fa-circle-xmark" style="color: var(--primary);"></i> Erro ao enviar!';
-            alert('Não foi possível enviar a imagem para o ImgBB. Verifique sua conexão e tente novamente.');
+            modalStatusText.textContent = "Erro ao enviar imagem!";
+            alert("Erro ao enviar imagem para o ImgBB. Tente novamente.");
+            modalUploadStatus.style.display = 'none';
         } finally {
-            btnUploadTrigger.disabled = false;
-            pPhotoFile.value = ''; // Limpa input
+            pPhotoFile.value = ''; // Limpa seletor
         }
-    });
+    }
 
+    // --- CONTROLES DE OUTPUT E GERAÇÃO ---
     function appendLine(line) {
         if (outputText.value) {
             outputText.value += '\n' + line;
@@ -878,6 +981,7 @@
 
         appendLine(line);
         pName.value = ''; // Limpa nome para o próximo
+        pPhoto.value = ''; // Limpa foto
         pName.focus();
     });
 
@@ -907,16 +1011,20 @@
 
         let line = `${name} | ${over} | ${pos} | ${col} | ${nation} | ${club} | ${a1} | ${a2} | ${a3} | ${a4} | ${a5} | ${a6} | ${weakFootValue} | ${skillMovesValue}`;
         
-        // Adiciona playstyles e foto se houverem, ou preenche com pipe para manter o formato completo
+        // Adiciona playstyles e foto se houverem
         if (playstyles || photo) {
             line += ` | ${playstyles}`;
+        } else if (photo) {
+            line += ` | `;
         }
+        
         if (photo) {
             line += ` | ${photo}`;
         }
 
         appendLine(line);
         pName.value = ''; // Limpa nome
+        pPhoto.value = ''; // Limpa foto
         // Desativa playstyles
         chips.forEach(c => c.classList.remove('active'));
         pName.focus();
@@ -940,7 +1048,6 @@
                 toast.classList.remove('show');
             }, 2000);
         }).catch(err => {
-            // Fallback se navigator.clipboard falhar
             outputText.select();
             document.execCommand('copy');
             toast.classList.add('show');
@@ -948,6 +1055,25 @@
                 toast.classList.remove('show');
             }, 2000);
         });
+    });
+
+    // Exportar / Baixar arquivo jogadores.txt
+    document.getElementById('btn-export').addEventListener('click', () => {
+        const text = outputText.value;
+        if (!text) {
+            alert('Não há jogadores cadastrados na lista para exportar!');
+            return;
+        }
+
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'jogadores.txt';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     });
 </script>
 

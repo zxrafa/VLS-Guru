@@ -241,7 +241,6 @@ class VLSModal(discord.ui.Modal):
 
 
 class CriarJogadorModal1(VLSModal, title="Criar Jogador — Etapa 1/3: Dados Básicos"):
-    p_id        = discord.ui.TextInput(label="ID único (ex: messi, cr7)", placeholder="Letras minúsculas sem espaço", max_length=30)
     p_nome      = discord.ui.TextInput(label="Nome completo", placeholder="Ex: Lionel Messi", max_length=50)
     p_overall   = discord.ui.TextInput(label="Overall (Rated)", placeholder="Ex: 91", max_length=3)
     p_posicao   = discord.ui.TextInput(label="Posição (GK, CB, CM, ST...)", placeholder="Ex: ST", max_length=5)
@@ -266,9 +265,24 @@ class CriarJogadorModal1(VLSModal, title="Criar Jogador — Etapa 1/3: Dados Bá
                 f"❌ Coleção `{self.p_colecao}` não existe. Crie primeiro em Coleções.", ephemeral=True
             )
 
+        # Gera o ID dinamicamente a partir do nome do jogador
+        import re
+        import unicodedata
+
+        nome_original = str(self.p_nome).strip()
+        # Normaliza removendo acentos
+        nome_normalizado = unicodedata.normalize('NFKD', nome_original).encode('ASCII', 'ignore').decode('ASCII')
+        nome_normalizado = nome_normalizado.lower()
+        # Remove caracteres especiais e substitui espaços por underlines
+        nome_normalizado = re.sub(r'[^a-z0-9\s-]', '', nome_normalizado)
+        slug_id = re.sub(r'[\s-]+', '_', nome_normalizado).strip('_')
+
+        if not slug_id:
+            return await interaction.response.send_message("❌ Nome inválido para geração de ID do jogador.", ephemeral=True)
+
         _PENDING_PLAYER[interaction.user.id] = {
-            "id": str(self.p_id).lower().strip(),
-            "name": str(self.p_nome).strip(),
+            "id": slug_id,
+            "name": nome_original,
             "over": overall,
             "pos": pos_upper,
             "col_id": col_record["data"]["id"],

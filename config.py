@@ -3,6 +3,9 @@
 VLS Guru - Configurações e Constantes do Reboot
 """
 
+# IDs de usuários com acesso total ao painel admin, mesmo sem ser admin de servidor
+ALLOWED_ADMIN_IDS: set[int] = {338704196180115458, 1411893056516391034, 792144300666126336}
+
 # Emojis e Moedas
 VLS_COINS_EMOJI = "<:VLScoins:1517258837004914848>"
 

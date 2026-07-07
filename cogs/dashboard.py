@@ -15,7 +15,7 @@ from database import (
     get_all_players, get_user_profile, save_user_profile,
     db_get_prefix, get_missions, get_all_users
 )
-from config import PLAYSTYLE_EMOJIS, POSITIONS_ALL, VLS_COINS_EMOJI
+from config import PLAYSTYLE_EMOJIS, POSITIONS_ALL, VLS_COINS_EMOJI, ALLOWED_ADMIN_IDS
 # Removido gerador automático de cartas
 import asyncio
 
@@ -80,7 +80,7 @@ class ContinuarMissao2View(discord.ui.View):
 
 
 def is_admin(interaction: discord.Interaction) -> bool:
-    return interaction.user.guild_permissions.administrator
+    return interaction.user.guild_permissions.administrator or interaction.user.id in ALLOWED_ADMIN_IDS
 
 
 # ══════════════════════════════════════════════════════════

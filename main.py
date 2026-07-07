@@ -32,6 +32,7 @@ from database import (
     get_all_players, get_all_users, get_all_collections,
     get_campeonato_times, save_time, delete_time
 )
+from config import ALLOWED_ADMIN_IDS
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -42,9 +43,6 @@ DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "https://vlsleague.squareweb.app/callback")
 IMGBB_API_KEY         = "617c898158c94ac25ddaf2491ee7d0b4"
-
-# IDs de usuários com acesso total ao painel admin, mesmo sem ser admin de servidor
-ALLOWED_ADMIN_IDS: set[int] = {338704196180115458, 1411893056516391034, 792144300666126336}
 
 # Sessões web em memória
 WEB_SESSIONS: dict = {}

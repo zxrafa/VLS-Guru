@@ -13,7 +13,7 @@ from database import (
     db_get, db_upsert, db_delete, get_all_players,
     get_user_profile, save_user_profile, db_clear_all
 )
-from config import VLS_COINS_EMOJI
+from config import VLS_COINS_EMOJI, ALLOWED_ADMIN_IDS
 
 class AdminCog(commands.Cog, name="Admin"):
     def __init__(self, bot):
@@ -21,7 +21,7 @@ class AdminCog(commands.Cog, name="Admin"):
 
     # Helper de checagem para permissão de administrador
     def is_admin(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.guild_permissions.administrator
+        return interaction.user.guild_permissions.administrator or interaction.user.id in ALLOWED_ADMIN_IDS
 
     @app_commands.command(name="liberar_tudo", description="[Admin] Adiciona todos os jogadores do catálogo global ao elenco do membro selecionado.")
     @app_commands.describe(usuario="Membro que receberá todas as cartas do catálogo")

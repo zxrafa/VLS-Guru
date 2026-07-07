@@ -821,6 +821,7 @@ async def on_ready():
         "cogs.market",
         "cogs.matches",
         "cogs.help",
+        "cogs.chat",
         "cogs.dashboard",
     ]
     for cog_path in cogs_to_load:

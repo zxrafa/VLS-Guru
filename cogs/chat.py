@@ -14,10 +14,10 @@ from discord.ext import commands
 from datetime import datetime
 
 from database import db_get, db_upsert, get_user_profile, save_user_profile, get_all_players
+from config import ALLOWED_ADMIN_IDS as ALLOWED_NLP_ADMINS
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CHAT_CHANNEL_ID = 1524177774682837022
-ALLOWED_NLP_ADMINS = [338704196180115458, 1267656061503143948]
 
 
 class ChatCog(commands.Cog, name="Chat"):
@@ -142,20 +142,26 @@ class ChatCog(commands.Cog, name="Chat"):
             '  "params": {\n'
             '    "user_id": "id_do_usuario_alvo",\n'
             '    "amount": 10000,\n'
-            '    "player_name_or_id": "nome_do_jogador"\n'
+            '    "player_name_or_id": "nome_do_jogador",\n'
+            '    "to_user_id": "id_do_destinatario_se_transferir",\n'
+            '    "cooldown_type": "all/recrutar/caixa/roleta"\n'
             "  },\n"
             '  "reply": "resposta super curta, informal e tudo minúsculo para o admin confirmando a ação"\n'
             "}\n\n"
             "Ações Suportadas:\n"
-            '1. "give_money": dar dinheiro (R$) para um usuário. Parâmetros: "user_id" (menção no formato <@ID> ou "self"), "amount" (inteiro positivo).\n'
+            '1. "give_money": dar dinheiro (R$) para um usuário. Parâmetros: "user_id" (menção no formato <@ID>, ID puro ou "self"), "amount" (inteiro positivo).\n'
             '2. "give_coins": dar VLS Coins para um usuário. Parâmetros: "user_id" (menção <@ID> ou "self"), "amount" (inteiro positivo).\n'
             '3. "give_player": dar um jogador para um usuário. Parâmetros: "user_id" (menção <@ID> ou "self"), "player_name_or_id" (nome aproximado do jogador, ex: "messi" ou "neymar").\n'
             '4. "remove_player": remover jogador do elenco de um usuário. Parâmetros: "user_id" (menção <@ID> ou "self"), "player_name_or_id" (nome aproximado do jogador).\n'
-            '5. "none": apenas responder ao admin sem nenhuma alteração no banco (conversas gerais, dúvidas, etc.).\n\n'
+            '5. "take_money": tirar/remover/pegar dinheiro (R$) de um usuário. Parâmetros: "user_id" (menção <@ID> ou "self"), "amount" (inteiro positivo).\n'
+            '6. "take_coins": tirar/remover/pegar VLS Coins de um usuário. Parâmetros: "user_id" (menção <@ID> ou "self"), "amount" (inteiro positivo).\n'
+            '7. "transfer_money": transferir/mandar dinheiro de um usuário para outro. Parâmetros: "user_id" (quem envia, ex: <@ID1> ou "self"), "to_user_id" (quem recebe, ex: <@ID2>), "amount" (inteiro positivo).\n'
+            '8. "reset_cooldown": resetar/zerar o cooldown (tempo de espera) de recrutar, caixa ou roleta de alguém. Parâmetros: "user_id" (menção <@ID> ou "self"), "cooldown_type" (pode ser "recrutar", "caixa", "roleta" ou "all").\n'
+            '9. "none": apenas responder ao admin sem nenhuma alteração no banco (conversas gerais, dúvidas, etc.).\n\n'
             "Notas importantes:\n"
             "- Se o admin falar 'dar dinheiro para mim' ou similar, use 'self' no user_id.\n"
             "- Se o admin disser 'dar dinheiro para fulano' e houver uma menção tipo <@123456789>, extraia exatamente o ID do usuário (ex: '123456789') e use no user_id.\n"
-            "- Sua resposta de texto na chave 'reply' deve sempre ser tudo minúscula, super curta, informal e usar abreviações humanas (ex: 'pronto mano dei 50k pra ele blz', 'vlw dei o messi pro cara', 'eae blz o q manda')."
+            "- Sua resposta de texto na chave 'reply' deve sempre ser tudo minúscula, super curta, informal e usar abreviações humanas (ex: 'pronto mano dei 50k pra ele blz', 'vlw tirei a carta do cara', 'cooldowns zerados pro cara', 'eae blz o q manda')."
         )
 
         payload = {
@@ -239,6 +245,65 @@ class ChatCog(commands.Cog, name="Chat"):
             profile["premium_coins"] = profile.get("premium_coins", 0) + amount
             await save_user_profile(target_id, profile)
             print(f"[Admin NLP] {amount} VLS Coins dadas para {target_user}")
+            return None
+
+        elif action == "take_money":
+            amount = int(params.get("amount", 0))
+            profile["money"] = max(0, profile.get("money", 0) - amount)
+            await save_user_profile(target_id, profile)
+            print(f"[Admin NLP] R$ {amount:,} retirados de {target_user}")
+            return None
+
+        elif action == "take_coins":
+            amount = int(params.get("amount", 0))
+            profile["premium_coins"] = max(0, profile.get("premium_coins", 0) - amount)
+            await save_user_profile(target_id, profile)
+            print(f"[Admin NLP] {amount} VLS Coins retirados de {target_user}")
+            return None
+
+        elif action == "transfer_money":
+            amount = int(params.get("amount", 0))
+            to_user_id_raw = params.get("to_user_id")
+            if not to_user_id_raw:
+                return "❌ vc não me disse quem vai receber o dinheiro"
+            
+            to_target_id = "".join(c for c in str(to_user_id_raw) if c.isdigit())
+            if not to_target_id:
+                return "❌ não encontrei o id de quem vai receber o dinheiro"
+            to_target_id = int(to_target_id)
+            
+            try:
+                to_target_user = self.bot.get_user(to_target_id)
+                if not to_target_user:
+                    to_target_user = await self.bot.fetch_user(to_target_id)
+            except Exception:
+                return "❌ destinatário não encontrado no discord"
+                
+            to_profile = await get_user_profile(to_target_user)
+            
+            if profile.get("money", 0) < amount:
+                return f"❌ o usuário {target_user} não tem dinheiro suficiente (possui R$ {profile.get('money', 0):,})"
+                
+            profile["money"] -= amount
+            to_profile["money"] = to_profile.get("money", 0) + amount
+            
+            await save_user_profile(target_id, profile)
+            await save_user_profile(to_target_id, to_profile)
+            print(f"[Admin NLP] R$ {amount:,} transferidos de {target_user} para {to_target_user}")
+            return None
+
+        elif action == "reset_cooldown":
+            cooldown_type = str(params.get("cooldown_type", "all")).lower().strip()
+            
+            if cooldown_type in ["recrutar", "all"]:
+                profile["last_claim"] = 0
+            if cooldown_type in ["caixa", "all"]:
+                profile["last_sobre"] = 0
+            if cooldown_type in ["roleta", "all"]:
+                profile["last_roleta"] = 0
+                
+            await save_user_profile(target_id, profile)
+            print(f"[Admin NLP] Cooldowns ({cooldown_type}) zerados para {target_user}")
             return None
 
         elif action == "give_player":

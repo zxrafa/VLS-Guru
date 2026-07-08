@@ -14,7 +14,7 @@ HELP_CATEGORIES = [
         "emoji": "💵",
         "commands": [
             ("`/saldo`", "Consulta seu saldo bancário e VLS Coins."),
-            ("`/caixa`", "Abre uma caixa misteriosa gratuita (cooldown 12h)."),
+            ("`/caixa`", "Abre uma caixa misteriosa gratuita (cooldown 8h)."),
             ("`/recrutar`", "Envia olheiros para recrutar um jogador aleatório (cooldown 10min)."),
             ("`/loja`", "Abre a loja de pacotes premium com 💎 Moedas."),
             ("`/transferir`", "Envia dinheiro ou VLS Coins para outro manager."),
@@ -26,7 +26,7 @@ HELP_CATEGORIES = [
         "name": "🏪 Mercado de Transferências",
         "emoji": "🏪",
         "commands": [
-            ("`/vender`", "Vende um jogador do seu inventário diretamente para a CPU (Quick Sell por 5%)."),
+            ("`/vender`", "Vende um jogador do seu inventário diretamente para a CPU (Quick Sell por 25%)."),
             ("`/mercado`", "Lista todos os jogadores disponíveis no catálogo global de transferências."),
             ("`/contratar`", "Pesquisa e contrata um jogador do catálogo global."),
         ]

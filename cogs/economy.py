@@ -215,7 +215,7 @@ class EconomyCog(commands.Cog, name="Economia"):
             return await interaction.followup.send("❌ Nenhum jogador cadastrado no mercado.")
 
         custom_products = await db_get_prefix("loja_produto_")
-        view = LojaView(interaction.user, all_players, custom_products)
+        view = LojaView(interaction.user, all_players, custom_products, cog=self)
         embed = await view.make_category_embed()
         await interaction.followup.send(embed=embed, view=view)
 
@@ -855,12 +855,13 @@ class BuyTacticSelect(discord.ui.Select):
 
 
 class LojaView(discord.ui.View):
-    def __init__(self, user, all_players, custom_products=None):
+    def __init__(self, user, all_players, custom_products=None, cog=None):
         super().__init__(timeout=180)
         self.user = user
         self.all_players = all_players
         self.custom_products = custom_products or []
         self.current_category = "packs"
+        self.cog = cog
         
         # Adiciona a seleção de categoria
         self.add_item(LojaCategorySelect(all_players, self.custom_products))
@@ -986,10 +987,11 @@ class LojaView(discord.ui.View):
             drawn_players.append((chosen_rarity, player))
 
         # Incrementa missões de recrutamento
-        await self.increment_mission(interaction.user.id, profile, "recrutar", num_cards)
-        for rarity, p in drawn_players:
-            if p.get("over", 0) >= 80:
-                await self.increment_mission(interaction.user.id, profile, "recrutar_80", 1)
+        if self.cog:
+            await self.cog.increment_mission(interaction.user.id, profile, "recrutar", num_cards)
+            for rarity, p in drawn_players:
+                if p.get("over", 0) >= 80:
+                    await self.cog.increment_mission(interaction.user.id, profile, "recrutar_80", 1)
 
         await save_user_profile(interaction.user.id, profile)
 
@@ -1033,7 +1035,7 @@ class ClaimView(discord.ui.View):
         super().__init__(timeout=60)
         self.user = user
         self.player = player
-        self.preco_venda = int(preco * 0.05)
+        self.preco_venda = int(preco * 0.25)
         self.processed = False
         self.confirming_sale = False
         self.message = None

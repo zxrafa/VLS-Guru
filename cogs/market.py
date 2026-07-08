@@ -41,7 +41,7 @@ def calculate_player_price(player: dict, col_multipliers: dict) -> int:
 
 def calculate_quick_sell(player: dict, col_multipliers: dict) -> int:
     market_price = calculate_player_price(player, col_multipliers)
-    return int(market_price * 0.05)
+    return int(market_price * 0.25)
 
 
 class PlayerSellView(discord.ui.View):
@@ -68,7 +68,7 @@ class PlayerSellView(discord.ui.View):
         embed.add_field(name="Jogador", value=f"{col_emoji} **{player['name']}**", inline=True)
         embed.add_field(name="Posição / Rated", value=f"⚽ {player.get('pos','?')}  •  ⭐ {player.get('over','?')}", inline=True)
         embed.add_field(name="Coleção", value=col_nome, inline=True)
-        embed.add_field(name="Valor de Venda (5%)", value=f"R$ **{preco_quick:,}**", inline=False)
+        embed.add_field(name="Valor de Venda (25%)", value=f"R$ **{preco_quick:,}**", inline=False)
         
         file = None
         if player.get("card"):
@@ -359,7 +359,7 @@ class MarketCog(commands.Cog, name="Mercado"):
         total_pages = view.total_pages
         await interaction.response.send_message(
             f"🗑️ **Venda em Massa** — Selecione os jogadores que deseja vender.\n"
-            f"O valor de cada um é **5%** do preço de mercado.\n"
+            f"O valor de cada um é **25%** do preço de mercado.\n"
             f"*(Página 1/{total_pages} • {len(inventory)} jogadores no elenco)*",
             view=view,
             ephemeral=True,
@@ -443,7 +443,8 @@ class MarketCog(commands.Cog, name="Mercado"):
     async def ofertas(self, interaction: discord.Interaction):
         await interaction.response.defer()
         
-        offers = await db_get("global_offers")
+        offers_doc = await db_get("global_offers")
+        offers = offers_doc["data"] if offers_doc else None
         now = time.time()
         
         if not offers or (now - offers.get("last_update", 0)) >= 43200:
@@ -634,9 +635,10 @@ class OfertasSelect(discord.ui.Select):
         await interaction.response.defer()
         
         selected_id = self.values[0]
-        offers = await db_get("global_offers")
-        if not offers:
+        offers_doc = await db_get("global_offers")
+        if not offers_doc:
             return await interaction.followup.send("❌ Ofertas expiradas. Use `/ofertas` novamente para recarregar.", ephemeral=True)
+        offers = offers_doc["data"]
             
         selected_player = next((p for p in offers["players"] if p.get("id") == selected_id), None)
         if not selected_player:
@@ -671,7 +673,7 @@ class OfertasSelect(discord.ui.Select):
         player_copy.pop("preco_original", None)
         player_copy.pop("preco_desconto", None)
         
-        profile["inventory"].append(player_copy)
+        profile.setdefault("inventory", []).append(player_copy)
         await save_user_profile(interaction.user.id, profile)
         
         await interaction.followup.send(

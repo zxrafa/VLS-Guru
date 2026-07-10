@@ -486,11 +486,12 @@ class MatchesCog(commands.Cog, name="Partidas"):
 
     @app_commands.command(name="treino", description="Realiza um treino contra a CPU para aumentar a afinidade dos titulares (cooldown: 5 min).")
     async def treino(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         profile     = await get_user_profile(interaction.user)
         starting_xi = profile.get("starting_xi", [])
 
         if len(starting_xi) < 11:
-            return await interaction.response.send_message("❌ Você precisa de 11 titulares escalados para treinar.", ephemeral=True)
+            return await interaction.followup.send("❌ Você precisa de 11 titulares escalados para treinar.", ephemeral=True)
 
         now      = int(time.time())
         last_t   = profile.get("last_treino", 0)
@@ -500,12 +501,11 @@ class MatchesCog(commands.Cog, name="Partidas"):
             remaining = cooldown - (now - last_t)
             minutos = remaining // 60
             segundos = remaining % 60
-            return await interaction.response.send_message(
+            return await interaction.followup.send(
                 f"⏳ Seu elenco ainda está em recuperação. Aguarde **{minutos}m {segundos}s** para o próximo treino.",
                 ephemeral=True,
             )
 
-        await interaction.response.defer()
         profile["last_treino"] = now
 
         # Calcula o OVR médio do time do jogador

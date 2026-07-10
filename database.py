@@ -21,6 +21,11 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 use_supabase = bool(SUPABASE_URL and SUPABASE_KEY)
 supabase_client = None
 
+_prefix_cache = {}
+_prefix_cache_times = {}
+CACHE_TTL = 300  # 5 minutos de TTL para listas semi-estáticas
+_user_profile_cache = {}
+
 if use_supabase:
     try:
         from supabase import create_client
@@ -182,6 +187,18 @@ async def db_get(doc_id: str):
         return await asyncio.to_thread(fetch)
 
 async def db_upsert(doc_id: str, data: dict):
+    for prefix in ["player_", "col_", "mission_"]:
+        if doc_id.startswith(prefix):
+            _prefix_cache.pop(prefix, None)
+            
+    if doc_id.startswith("user_"):
+        try:
+            uid = int(doc_id.split("_")[1])
+            from copy import deepcopy
+            _user_profile_cache[uid] = deepcopy(data)
+        except Exception:
+            pass
+            
     if use_supabase:
         def push():
             try:
@@ -205,6 +222,17 @@ async def db_upsert(doc_id: str, data: dict):
         await asyncio.to_thread(push)
 
 async def db_delete(doc_id: str):
+    for prefix in ["player_", "col_", "mission_"]:
+        if doc_id.startswith(prefix):
+            _prefix_cache.pop(prefix, None)
+            
+    if doc_id.startswith("user_"):
+        try:
+            uid = int(doc_id.split("_")[1])
+            _user_profile_cache.pop(uid, None)
+        except Exception:
+            pass
+            
     if use_supabase:
         def remove():
             try:
@@ -229,6 +257,11 @@ async def db_delete(doc_id: str):
 # HELPERS DE CONTROLE DE PERFIL DE USUÁRIOS
 # ==============================================================================
 async def get_user_profile(user: discord.abc.User) -> dict:
+    from copy import deepcopy
+    user_id = user.id
+    if user_id in _user_profile_cache:
+        return deepcopy(_user_profile_cache[user_id])
+        
     doc_id = f"user_{user.id}"
     record = await db_get(doc_id)
     
@@ -262,6 +295,7 @@ async def get_user_profile(user: discord.abc.User) -> dict:
             "acquired_badges": []
         }
         await db_upsert(doc_id, default_profile)
+        _user_profile_cache[user_id] = deepcopy(default_profile)
         return default_profile
     else:
         profile = record["data"]
@@ -290,9 +324,12 @@ async def get_user_profile(user: discord.abc.User) -> dict:
         
         if changed:
             await db_upsert(doc_id, profile)
+        _user_profile_cache[user_id] = deepcopy(profile)
         return profile
 
 async def save_user_profile(user_id: int, profile: dict):
+    from copy import deepcopy
+    _user_profile_cache[user_id] = deepcopy(profile)
     doc_id = f"user_{user_id}"
     await db_upsert(doc_id, profile)
 
@@ -314,12 +351,21 @@ async def get_missions() -> list[dict]:
 
 async def db_get_prefix(prefix: str) -> list[dict]:
     """Busca todos os registros cujo ID começa com o prefixo informado."""
+    import time
+    now = time.time()
+    if prefix in ["player_", "col_", "mission_"]:
+        if prefix in _prefix_cache:
+            last_time = _prefix_cache_times.get(prefix, 0)
+            if now - last_time < CACHE_TTL:
+                return list(_prefix_cache[prefix])
+
+    res = None
     if use_supabase:
         def fetch_all():
             try:
-                res = supabase_client.table("jogadores").select("data").like("id", f"{prefix}%").execute()
+                res_data = supabase_client.table("jogadores").select("data").like("id", f"{prefix}%").execute()
                 out = []
-                for r in res.data:
+                for r in res_data.data:
                     data_field = r["data"]
                     if isinstance(data_field, str):
                         data_field = json.loads(data_field)
@@ -328,7 +374,7 @@ async def db_get_prefix(prefix: str) -> list[dict]:
             except Exception as e:
                 print(f"Erro ao buscar com prefixo '{prefix}' no Supabase: {e}")
                 return []
-        return await asyncio.to_thread(fetch_all)
+        res = await asyncio.to_thread(fetch_all)
     else:
         def fetch_all():
             try:
@@ -341,11 +387,20 @@ async def db_get_prefix(prefix: str) -> list[dict]:
             except Exception as e:
                 print(f"Erro ao buscar com prefixo '{prefix}': {e}")
                 return []
-        return await asyncio.to_thread(fetch_all)
+        res = await asyncio.to_thread(fetch_all)
+
+    if prefix in ["player_", "col_", "mission_"] and res is not None:
+        _prefix_cache[prefix] = res
+        _prefix_cache_times[prefix] = now
+    return list(res) if isinstance(res, list) else res
 
 
 async def db_clear_all() -> int:
     """Apaga todos os registros do banco de dados (usado para reset de sistema). Retorna o número de registros apagados."""
+    _prefix_cache.clear()
+    _prefix_cache_times.clear()
+    _user_profile_cache.clear()
+    
     if use_supabase:
         def clear():
             try:

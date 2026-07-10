@@ -831,13 +831,16 @@ async def on_ready():
         except Exception as exc:
             print(f"  ❌ Falha ao carregar {cog_path}: {exc}")
 
-    try:
-        all_tree_cmds = [c.name for c in bot.tree.get_commands()]
-        print(f"DEBUG: Comandos na Tree antes do sync ({len(all_tree_cmds)}): {all_tree_cmds}")
-        synced = await bot.tree.sync()
-        print(f"✨ {len(synced)} comandos slash sincronizados globalmente.")
-    except Exception as exc:
-        print(f"❌ Erro ao sincronizar comandos: {exc}")
+    if os.getenv("SYNC_COMMANDS", "").lower() == "true":
+        try:
+            all_tree_cmds = [c.name for c in bot.tree.get_commands()]
+            print(f"DEBUG: Comandos na Tree antes do sync ({len(all_tree_cmds)}): {all_tree_cmds}")
+            synced = await bot.tree.sync()
+            print(f"✨ {len(synced)} comandos slash sincronizados globalmente.")
+        except Exception as exc:
+            print(f"❌ Erro ao sincronizar comandos: {exc}")
+    else:
+        print("ℹ️ Sincronização global de comandos slash ignorada. (Defina SYNC_COMMANDS=true para forçar o sync)")
 
     await start_web_server()
 

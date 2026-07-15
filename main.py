@@ -823,6 +823,7 @@ async def on_ready():
         "cogs.help",
         "cogs.chat",
         "cogs.dashboard",
+        "cogs.giveaway",
     ]
     for cog_path in cogs_to_load:
         try:

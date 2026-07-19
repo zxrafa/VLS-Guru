@@ -276,8 +276,6 @@ class PlaystyleDropdown(discord.ui.Select):
             description=f"**Descrição:**\n{value['desc']}\n\n**Efeito em Jogo:**\n`{value['effect']}`",
             color=discord.Color.gold()
         )
-        narr_text = "\n".join(value["narration"])
-        embed.add_field(name="🎙️ Narrações em Jogo", value=narr_text, inline=False)
         
         # Mantém o dropdown ativo para trocar de playstyle
         view = discord.ui.View(timeout=120)

@@ -2324,8 +2324,12 @@ class DraftView(discord.ui.View):
             if any(self.filled_slots[s] is None for s in slots):
                 needed_classes.append(p_class)
                 
-        # Filtra jogadores que servem nas vagas restantes
-        needed_players = [p for p in self.players_pool if get_position_class(p.get("pos", "CM")) in needed_classes]
+        # Filtra a pool de jogadores para excluir os que já foram selecionados (drafted) no time
+        drafted_ids = {p["id"] for p in self.drafted_team if "id" in p}
+        available_pool = [p for p in self.players_pool if p.get("id") not in drafted_ids]
+        
+        # Filtra jogadores da pool disponível que servem nas vagas restantes
+        needed_players = [p for p in available_pool if get_position_class(p.get("pos", "CM")) in needed_classes]
         
         # Garante pelo menos 2 jogadores que cabem nas posições vazias (se houver)
         options = []
@@ -2333,11 +2337,11 @@ class DraftView(discord.ui.View):
             sample_needed = random.sample(needed_players, min(2, len(needed_players)))
             options.extend(sample_needed)
             
-        # Completa as vagas restantes com jogadores totalmente aleatórios da pool global
+        # Completa as vagas restantes com jogadores totalmente aleatórios da pool disponível
         remaining_count = 5 - len(options)
         if remaining_count > 0:
-            available_pool = [p for p in self.players_pool if p not in options]
-            sample_any = random.sample(available_pool, min(remaining_count, len(available_pool)))
+            available_pool_remaining = [p for p in available_pool if p not in options]
+            sample_any = random.sample(available_pool_remaining, min(remaining_count, len(available_pool_remaining)))
             options.extend(sample_any)
             
         random.shuffle(options)
@@ -2408,21 +2412,45 @@ class DraftView(discord.ui.View):
     async def finish_draft(self, interaction: discord.Interaction):
         self.clear_items()
         
-        embed_loading = discord.Embed(
-            title="🎮 MODO 7-0 — Iniciando Simulações",
-            description="⏱️ **Aguarde...** O bot está simulando as 7 partidas contra os times da CPU!",
-            color=discord.Color.gold()
+        # Cria a view de simulação interativa
+        sim_view = SimulationView(
+            user_id = self.user_id,
+            drafted_team = self.drafted_team,
+            players_pool = self.players_pool,
+            cog = self.cog,
+            interaction = interaction
         )
-        await interaction.edit_original_response(embed=embed_loading, view=None)
+        # Inicia a transmissão em segundo plano para não travar a thread de resposta
+        asyncio.create_task(sim_view.start_transmission())
+
+
+class SimulationView(discord.ui.View):
+    def __init__(self, user_id: int, drafted_team: list, players_pool: list, cog: MatchesCog, interaction: discord.Interaction):
+        super().__init__(timeout=900)
+        self.user_id = user_id
+        self.drafted_team = drafted_team
+        self.players_pool = players_pool
+        self.cog = cog
+        self.interaction = interaction
         
-        wins = 0
-        draws = 0
-        losses = 0
-        games_log = []
+        self.speed = 1.0  # multiplicador de velocidade
+        self.paused = False
+        self.skipped_game = False
+        self.skipped_all = False
+        self.current_game_idx = 0
         
+        self.wins = 0
+        self.draws = 0
+        self.losses = 0
+        self.games_log = []
+        
+        # Simula as 7 partidas e armazena os resultados e narrações
+        self.matches_data = []
+        self.simulate_all_matches()
+        
+    def simulate_all_matches(self):
         draft_ovrs = [p.get("over", 70) for p in self.drafted_team]
         avg_ovr = int(sum(draft_ovrs) / 11)
-        
         p1_chem = calculate_chemistry_bonus(self.drafted_team, "4-3-3")
         
         for game_idx in range(1, 8):
@@ -2478,57 +2506,134 @@ class DraftView(discord.ui.View):
                 p1_torcida_level = 1,
                 p2_torcida_level = 1,
             )
+            self.matches_data.append(sim_res)
+
+    async def start_transmission(self):
+        for game_idx, sim_res in enumerate(self.matches_data, 1):
+            self.current_game_idx = game_idx
+            self.skipped_game = False
             
-            g_user = sim_res["p1_goals"]
-            g_cpu = sim_res["p2_goals"]
+            g_user = 0
+            g_cpu = 0
             
-            if g_user > g_cpu:
-                wins += 1
+            narration = sim_res["narration"]
+            
+            for event_idx, event in enumerate(narration):
+                if self.skipped_all or self.skipped_game:
+                    break
+                    
+                while self.paused:
+                    await asyncio.sleep(0.5)
+                    if self.skipped_all or self.skipped_game:
+                        break
+                
+                # Checa por gols no texto
+                if "GOOOL" in event or "GOL" in event or "⚽" in event:
+                    # Tenta capturar o minuto do lance
+                    match = re.search(r"⏱️ \*\*(\d+)'\*\*", event)
+                    if match:
+                        min_val = int(match.group(1))
+                        for s in sim_res["scorers"]:
+                            if s["minute"] == min_val:
+                                if s["team"] == 1:
+                                    g_user += 1
+                                else:
+                                    g_cpu += 1
+                                break
+                
+                # Constrói estatísticas parciais proporcionais
+                stats = sim_res["stats"]
+                progress = (event_idx + 1) / len(narration)
+                p1_shots = int(stats["p1"]["shots"] * progress)
+                p2_shots = int(stats["p2"]["shots"] * progress)
+                p1_saves = int(stats["p1"]["saves"] * progress)
+                p2_saves = int(stats["p2"]["saves"] * progress)
+                
+                speed_text = f"{self.speed:.0f}x"
+                status_text = "⏸️ Pausado" if self.paused else "▶️ Transmitindo"
+                
+                embed = discord.Embed(
+                    title=f"🏟️ MODO 7-0 — SIMULAÇÃO AO VIVO (Jogo {game_idx}/7)",
+                    description=(
+                        f"**{self.cog.bot.user.name} Arena** • Rodada {game_idx}\n"
+                        f"⚔️ **Draft Team** {g_user} x {g_cpu} **CPU #{game_idx}**\n\n"
+                        f"🎙️ **Transmissão ao Vivo:**\n"
+                        f"{event}\n\n"
+                        f"📈 **Estatísticas do Jogo:**\n"
+                        f"🔹 Chutes: {p1_shots} x {p2_shots}\n"
+                        f"🔹 Defesas: {p1_saves} x {p2_saves}\n\n"
+                        f"⚙️ **Status:** {status_text} | ⏩ **Velocidade:** {speed_text}"
+                    ),
+                    color=discord.Color.purple()
+                )
+                
+                try:
+                    await self.interaction.edit_original_response(embed=embed, view=self)
+                except Exception:
+                    pass
+                
+                # Sleep dinâmico de acordo com a velocidade
+                sleep_time = 3.0 / self.speed
+                await asyncio.sleep(sleep_time)
+                
+            # Fim do jogo ou pulado
+            final_user = sim_res["p1_goals"]
+            final_cpu = sim_res["p2_goals"]
+            if final_user > final_cpu:
+                self.wins += 1
                 result_emoji = "✅ Vitória"
-            elif g_user == g_cpu:
-                draws += 1
+            elif final_user == final_cpu:
+                self.draws += 1
                 result_emoji = "⚪ Empate"
             else:
-                losses += 1
+                self.losses += 1
                 result_emoji = "❌ Derrota"
                 
-            games_log.append(f"🎮 **Jogo #{game_idx}:** Draft Team **{g_user}** x **{g_cpu}** {sim_res['p2_name']} — {result_emoji}")
+            self.games_log.append(f"🎮 **Jogo #{game_idx}:** Draft Team **{final_user}** x **{final_cpu}** CPU #{game_idx} — {result_emoji}")
             
+            if self.skipped_all:
+                break
+                
+        await self.finish_simulation()
+
+    async def finish_simulation(self):
+        self.clear_items()
+        
         money_prize = 0
         coins_prize = 0
-        drawn_card = None
         
-        if wins == 0:
+        if self.wins == 0:
             money_prize = 5_000
-        elif wins == 1:
+        elif self.wins == 1:
             money_prize = 12_000
-        elif wins == 2:
+        elif self.wins == 2:
             money_prize = 25_000
-        elif wins == 3:
+        elif self.wins == 3:
             money_prize = 45_000
-        elif wins == 4:
+        elif self.wins == 4:
             money_prize = 75_000
-        elif wins == 5:
+        elif self.wins == 5:
             money_prize = 120_000
             coins_prize = 10
-        elif wins == 6:
+        elif self.wins == 6:
             money_prize = 200_000
             coins_prize = 25
-        elif wins == 7:
+        elif self.wins == 7:
             money_prize = 400_000
             coins_prize = 70
-        profile = await get_user_profile(interaction.user)
+            
+        profile = await get_user_profile(self.interaction.user)
         profile["money"] = profile.get("money", 0) + money_prize
         profile["premium_coins"] = profile.get("premium_coins", 0) + coins_prize
         
-        await save_user_profile(interaction.user.id, profile)
+        await save_user_profile(self.interaction.user.id, profile)
         
         embed_final = discord.Embed(
             title="🏆 FIM DO MODO 7-0!",
             description=(
-                f"Manager: {interaction.user.mention}\n"
-                f"Campanha: **{wins} Vitórias / {draws} Empates / {losses} Derrotas**\n\n"
-                f"**Resultado dos confrontos:**\n" + "\n".join(games_log) + "\n\n"
+                f"Manager: {self.interaction.user.mention}\n"
+                f"Campanha: **{self.wins} Vitórias / {self.draws} Empates / {self.losses} Derrotas**\n\n"
+                f"**Resultado dos confrontos:**\n" + "\n".join(self.games_log) + "\n\n"
                 f"🎁 **Premiação Recebida:**\n"
                 f"💵 R$ {money_prize:,}\n"
                 f"🪙 {coins_prize} VLS Coins"
@@ -2536,7 +2641,56 @@ class DraftView(discord.ui.View):
             color=discord.Color.green()
         )
         embed_final.set_footer(text="Parabéns pela participação no 7-0! Volte amanhã!")
-        await interaction.edit_original_response(embed=embed_final, view=None)
+        try:
+            await self.interaction.edit_original_response(embed=embed_final, view=None)
+        except Exception:
+            pass
+
+    @discord.ui.button(label="Pausar", style=discord.ButtonStyle.secondary, emoji="⏯️", row=0)
+    async def toggle_pause(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌ Você não está comandando esta simulação.", ephemeral=True)
+        self.paused = not self.paused
+        button.label = "Continuar" if self.paused else "Pausar"
+        button.style = discord.ButtonStyle.success if self.paused else discord.ButtonStyle.secondary
+        await interaction.response.edit_message(view=self)
+        
+    @discord.ui.button(label="Velocidade 1x", style=discord.ButtonStyle.primary, emoji="⏩", row=0)
+    async def set_speed_1(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.speed = 1.0
+        await interaction.response.defer()
+        
+    @discord.ui.button(label="Velocidade 2x", style=discord.ButtonStyle.primary, emoji="⏩", row=0)
+    async def set_speed_2(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.speed = 2.0
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Velocidade 3x", style=discord.ButtonStyle.primary, emoji="⏩", row=0)
+    async def set_speed_3(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.speed = 3.0
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Pular Jogo", style=discord.ButtonStyle.danger, emoji="⏭️", row=1)
+    async def skip_game(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.skipped_game = True
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Pular Tudo", style=discord.ButtonStyle.danger, emoji="⏭️", row=1)
+    async def skip_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.user_id:
+            return await interaction.response.send_message("❌", ephemeral=True)
+        self.skipped_all = True
+        self.skipped_game = True
+        await interaction.response.defer()
+
 
 
 async def setup(bot: commands.Bot):

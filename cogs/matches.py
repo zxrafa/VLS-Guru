@@ -2198,26 +2198,73 @@ class DraftDropdown(discord.ui.Select):
         super().__init__(placeholder="Selecione um jogador para sua equipe...", options=select_options)
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
         view = self.view
         if interaction.user.id != view.user_id:
-            return await interaction.followup.send("❌ Você não está comandando este draft.", ephemeral=True)
+            return await interaction.response.send_message("❌ Você não está comandando este draft.", ephemeral=True)
             
         selected_idx = int(self.values[0])
         chosen_player = view.current_options[selected_idx]
         
-        slot = view.slots[view.current_slot_idx]
-        instanced = chosen_player.copy()
-        instanced["pos"] = slot
-        instanced["instance_id"] = f"draft_{view.current_slot_idx}"
-        view.drafted_team.append(instanced)
+        # Determina a classe de posições e os slots compatíveis
+        p_class = get_position_class(chosen_player.get("pos", "CM"))
+        class_slots = {
+            "GK": ["GK"],
+            "DEF": ["CB1", "CB2", "LB", "RB"],
+            "MID": ["CDM", "CM1", "CM2"],
+            "ATK": ["LW", "RW", "ST"]
+        }
         
-        view.current_slot_idx += 1
-        if view.current_slot_idx < len(view.slots):
+        target_slots = class_slots.get(p_class, ["CM1", "CM2"])
+        empty_slot = None
+        for slot in target_slots:
+            if view.filled_slots[slot] is None:
+                empty_slot = slot
+                break
+                
+        # Se a posição natural estiver cheia, checa se o jogador está completamente travado
+        if not empty_slot:
+            all_empty_slots = [s for s in view.slots if view.filled_slots[s] is None]
+            
+            # Checa se todas as 3 opções disponíveis na rodada pertencem a posições que já estão cheias
+            all_options_full = True
+            for opt in view.current_options:
+                opt_class = get_position_class(opt.get("pos", "CM"))
+                opt_slots = class_slots.get(opt_class, ["CM1", "CM2"])
+                if any(view.filled_slots[s] is None for s in opt_slots):
+                    all_options_full = False
+                    break
+            
+            # Se todas as opções estão cheias e ele não tem mais rerolls, permite colocar em qualquer vaga vazia
+            if all_options_full and view.rerolls_left <= 0:
+                if all_empty_slots:
+                    empty_slot = all_empty_slots[0]
+                    
+        if not empty_slot:
+            p_class_name = {"GK": "Goleiro", "DEF": "Defensor", "MID": "Meio-campista", "ATK": "Atacante"}.get(p_class, "Meio-campista")
+            return await interaction.response.send_message(
+                f"❌ Todas as vagas para a categoria **{p_class_name}** ({chosen_player.get('pos')}) já estão preenchidas!\n"
+                "Escolha outro jogador das 3 opções ou use Reroll.",
+                ephemeral=True
+            )
+            
+        await interaction.response.defer()
+        
+        instanced = chosen_player.copy()
+        instanced["original_pos"] = chosen_player.get("pos", "CM")
+        instanced["pos"] = empty_slot
+        instanced["instance_id"] = f"draft_{empty_slot}"
+        
+        view.filled_slots[empty_slot] = instanced
+        
+        # Mantém drafted_team atualizado
+        view.drafted_team = [view.filled_slots[s] for s in view.slots if view.filled_slots[s] is not None]
+        
+        empty_count = sum(1 for s in view.slots if view.filled_slots[s] is None)
+        if empty_count == 0:
+            await view.finish_draft(interaction)
+        else:
             await view.roll_options()
             await view.update_message(interaction)
-        else:
-            await view.finish_draft(interaction)
 
 
 class RerollButton(discord.ui.Button):
@@ -2251,61 +2298,37 @@ class DraftView(discord.ui.View):
         self.cog = cog
         
         self.slots = ["GK", "CB1", "CB2", "LB", "RB", "CDM", "CM1", "CM2", "LW", "RW", "ST"]
-        self.current_slot_idx = 0
+        self.filled_slots = {slot: None for slot in self.slots}
         self.drafted_team = []
         self.rerolls_left = 2
         self.current_options = []
         self.message = None
 
     async def roll_options(self):
-        slot = self.slots[self.current_slot_idx]
-        
-        if slot == "GK":
-            candidates = [p for p in self.players_pool if p.get("pos") == "GK"]
-        elif slot in ["CB1", "CB2"]:
-            candidates = [p for p in self.players_pool if p.get("pos") in ["CB", "LB", "RB"]]
-        elif slot == "LB":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["LB", "LWB", "CB"]]
-        elif slot == "RB":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["RB", "RWB", "CB"]]
-        elif slot == "CDM":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["CDM", "CM", "CB"]]
-        elif slot in ["CM1", "CM2"]:
-            candidates = [p for p in self.players_pool if p.get("pos") in ["CM", "CAM", "CDM", "LM", "RM"]]
-        elif slot == "LW":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["LW", "LM", "RW", "ST", "CF"]]
-        elif slot == "RW":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["RW", "RM", "LW", "ST", "CF"]]
-        elif slot == "ST":
-            candidates = [p for p in self.players_pool if p.get("pos") in ["ST", "CF", "LW", "RW"]]
-        else:
-            candidates = self.players_pool
-            
-        if len(candidates) < 3:
-            candidates = self.players_pool
-            
-        self.current_options = random.sample(candidates, min(3, len(candidates)))
+        self.current_options = random.sample(self.players_pool, min(3, len(self.players_pool)))
 
     async def update_message(self, interaction: discord.Interaction):
         self.clear_items()
         self.add_item(DraftDropdown(self.current_options))
         self.add_item(RerollButton(self.rerolls_left))
         
-        slot = self.slots[self.current_slot_idx]
-        
         drafted_str = ""
-        for i, p in enumerate(self.drafted_team):
-            emoji = p.get("col_emoji", "✨")
-            drafted_str += f"🔹 `[{self.slots[i]}]` {emoji} **{p['over']}** {p['pos']} - *{p['name']}*\n"
-            
+        for slot in self.slots:
+            p = self.filled_slots[slot]
+            if p:
+                emoji = p.get("col_emoji", "✨")
+                drafted_str += f"🔹 `[{slot}]` {emoji} **{p['over']}** {p['original_pos']} - *{p['name']}*\n"
+            else:
+                drafted_str += f"🔸 `[{slot}]` *Vazio*\n"
+                
+        drafted_count = sum(1 for s in self.slots if self.filled_slots[s] is not None)
         embed = discord.Embed(
             title="🎮 MODO 7-0 — Draft de Elenco",
             description=(
                 f"Monte sua equipe de 11 jogadores e enfrente 7 adversários!\n\n"
-                f"**Posição Atual:** 🎯 `[{slot}]`\n"
                 f"**Rerolls Restantes:** 🔄 {self.rerolls_left}\n\n"
-                f"**Time Escalado ({len(self.drafted_team)}/11):**\n"
-                f"{drafted_str if drafted_str else '*Nenhum jogador selecionado*'}"
+                f"**Time Escalado ({drafted_count}/11):**\n"
+                f"{drafted_str}"
             ),
             color=discord.Color.purple()
         )

@@ -2167,7 +2167,7 @@ class DraftDropdown(discord.ui.Select):
     def __init__(self, options_list: list):
         select_options = []
         for idx, p in enumerate(options_list):
-            emoji = p.get("col_emoji", "✨")
+            emoji = p.get("col_emoji") or "✨"
             label = f"{p['name']} (OVR {p['over']} | {p['pos']})"
             select_options.append(discord.SelectOption(
                 label=label[:100],
@@ -2227,8 +2227,6 @@ class DraftDropdown(discord.ui.Select):
                 ephemeral=True
             )
             
-        await interaction.response.defer()
-        
         instanced = chosen_player.copy()
         instanced["original_pos"] = chosen_player.get("pos", "CM")
         instanced["pos"] = empty_slot
@@ -2241,6 +2239,7 @@ class DraftDropdown(discord.ui.Select):
         
         empty_count = sum(1 for s in view.slots if view.filled_slots[s] is None)
         if empty_count == 0:
+            await interaction.response.defer()
             await view.finish_draft(interaction)
         else:
             await view.roll_options()
@@ -2257,13 +2256,12 @@ class RerollButton(discord.ui.Button):
         )
 
     async def callback(self, interaction: discord.Interaction):
-        await interaction.response.defer()
         view = self.view
         if interaction.user.id != view.user_id:
-            return await interaction.followup.send("❌ Você não está comandando este draft.", ephemeral=True)
+            return await interaction.response.send_message("❌ Você não está comandando este draft.", ephemeral=True)
             
         if view.rerolls_left <= 0:
-            return await interaction.followup.send("❌ Você não possui mais rerolls.", ephemeral=True)
+            return await interaction.response.send_message("❌ Você não possui mais rerolls.", ephemeral=True)
             
         view.rerolls_left -= 1
         await view.roll_options()
@@ -2313,7 +2311,14 @@ class DraftView(discord.ui.View):
             color=discord.Color.purple()
         )
         embed.set_footer(text="VLS Arena • Draft interactivo")
-        await interaction.edit_original_response(embed=embed, view=self)
+        
+        if interaction.response.is_done():
+            await interaction.message.edit(embed=embed, view=self)
+        else:
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except Exception:
+                await interaction.edit_original_response(embed=embed, view=self)
 
     async def finish_draft(self, interaction: discord.Interaction):
         self.clear_items()

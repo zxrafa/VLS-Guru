@@ -985,28 +985,8 @@ class MatchesCog(commands.Cog, name="Partidas"):
             
         await interaction.response.defer()
         
+        # Cooldown desativado por solicitação (sem limites)
         profile = await get_user_profile(interaction.user)
-        now = time.time()
-        
-        # Cooldown diário: 24 horas (12 horas para boosters)
-        last_modo = profile.get("last_modo_7_0", 0)
-        is_booster = getattr(interaction.user, "premium_since", None) is not None
-        cooldown = 43200 if is_booster else 86400
-        
-        if now - last_modo < cooldown:
-            restante = cooldown - (now - last_modo)
-            horas = int(restante // 3600)
-            minutos = int((restante % 3600) // 60)
-            segundos = int(restante % 60)
-            booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
-            time_str = f"{horas}h {minutos}m" if horas > 0 else f"{minutos}m {segundos}s"
-            return await interaction.followup.send(
-                f"⏳ {booster_msg}Você já jogou o Modo 7-0 hoje! Aguarde mais **{time_str}** para jogar novamente."
-            )
-            
-        # Registra o início do draft definindo o timestamp do cooldown (anti-cheat)
-        profile["last_modo_7_0"] = now
-        await save_user_profile(interaction.user.id, profile)
         
         from database import get_all_players as _get_all_players
         all_players = await _get_all_players()

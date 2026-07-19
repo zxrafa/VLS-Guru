@@ -2313,7 +2313,35 @@ class DraftView(discord.ui.View):
         self.message = None
 
     async def roll_options(self):
-        self.current_options = random.sample(self.players_pool, min(3, len(self.players_pool)))
+        class_slots = {
+            "GK": ["GK"],
+            "DEF": ["CB1", "CB2", "LB", "RB"],
+            "MID": ["CDM", "CM1", "CM2"],
+            "ATK": ["LW", "RW", "ST"]
+        }
+        needed_classes = []
+        for p_class, slots in class_slots.items():
+            if any(self.filled_slots[s] is None for s in slots):
+                needed_classes.append(p_class)
+                
+        # Filtra jogadores que servem nas vagas restantes
+        needed_players = [p for p in self.players_pool if get_position_class(p.get("pos", "CM")) in needed_classes]
+        
+        # Garante pelo menos 2 jogadores que cabem nas posições vazias (se houver)
+        options = []
+        if needed_players and len(needed_classes) > 0:
+            sample_needed = random.sample(needed_players, min(2, len(needed_players)))
+            options.extend(sample_needed)
+            
+        # Completa as vagas restantes com jogadores totalmente aleatórios da pool global
+        remaining_count = 5 - len(options)
+        if remaining_count > 0:
+            available_pool = [p for p in self.players_pool if p not in options]
+            sample_any = random.sample(available_pool, min(remaining_count, len(available_pool)))
+            options.extend(sample_any)
+            
+        random.shuffle(options)
+        self.current_options = options
 
     async def update_message(self, interaction: discord.Interaction):
         self.clear_items()

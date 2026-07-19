@@ -997,18 +997,34 @@ class MatchesCog(commands.Cog, name="Partidas"):
         view = DraftView(interaction.user.id, all_players, self)
         await view.roll_options()
         
-        slot = view.slots[0]
+        # Gera prancheta tática vazia inicial
+        from pitch_generator import generate_team_pitch
+        loop = asyncio.get_running_loop()
+        buffer = await loop.run_in_executor(
+            None,
+            generate_team_pitch,
+            [], # time vazio
+            "4-3-3",
+            profile.get("club_name", "FC VLS"),
+            profile.get("money", 0),
+            70,
+            None
+        )
+        buffer.seek(0)
+        file = discord.File(buffer, filename="pitch.png")
+        
+        drafted_str = "\n".join([f"🔸 `[{slot}]` *Vazio*" for slot in view.slots])
         embed = discord.Embed(
             title="🎮 MODO 7-0 — Draft de Elenco",
             description=(
                 f"Monte sua equipe de 11 jogadores e enfrente 7 adversários!\n\n"
-                f"**Posição Atual:** 🎯 `[{slot}]`\n"
                 f"**Rerolls Restantes:** 🔄 {view.rerolls_left}\n\n"
                 f"**Time Escalado (0/11):**\n"
-                f"*Nenhum jogador selecionado*"
+                f"{drafted_str}"
             ),
             color=discord.Color.purple()
         )
+        embed.set_image(url="attachment://pitch.png")
         embed.set_footer(text="VLS Arena • Draft interactivo")
         
         # Mostra opções iniciais
@@ -1016,7 +1032,7 @@ class MatchesCog(commands.Cog, name="Partidas"):
         view.add_item(DraftDropdown(view.current_options))
         view.add_item(RerollButton(view.rerolls_left))
         
-        view.message = await interaction.followup.send(embed=embed, view=view)
+        view.message = await interaction.followup.send(embed=embed, view=view, file=file)
 
     @app_commands.command(name="penalti_desafio", description="Desafia outro manager para uma disputa de pênaltis PvP (com ou sem aposta).")
     @app_commands.describe(adversario="Oponente para desafiar", aposta="Valor opcional de aposta em dinheiro")
@@ -2163,6 +2179,20 @@ class PenaltiAceitarView(discord.ui.View):
 
 # ── CLASSES AUXILIARES PARA O DRAFT MODO 7-0 ──────────────────────────────────
 
+def get_position_class(pos: str) -> str:
+    if not pos or not isinstance(pos, str):
+        return "MID"
+    pos = pos.upper().strip()
+    if pos == "GK":
+        return "GK"
+    if pos in ("CB", "LB", "RB", "LWB", "RWB"):
+        return "DEF"
+    if pos in ("CDM", "CM", "CAM", "LM", "RM"):
+        return "MID"
+    if pos in ("ST", "CF", "LW", "RW"):
+        return "ATK"
+    return "MID"
+
 class DraftDropdown(discord.ui.Select):
     def __init__(self, options_list: list):
         select_options = []
@@ -2294,12 +2324,38 @@ class DraftView(discord.ui.View):
         for slot in self.slots:
             p = self.filled_slots[slot]
             if p:
-                emoji = p.get("col_emoji", "✨")
+                emoji = p.get("col_emoji") or "✨"
                 drafted_str += f"🔹 `[{slot}]` {emoji} **{p['over']}** {p['original_pos']} - *{p['name']}*\n"
             else:
                 drafted_str += f"🔸 `[{slot}]` *Vazio*\n"
                 
         drafted_count = sum(1 for s in self.slots if self.filled_slots[s] is not None)
+        
+        # Gera a imagem da prancheta tática em tempo real
+        from pitch_generator import generate_team_pitch
+        profile = await get_user_profile(interaction.user)
+        
+        starting_xi = [self.filled_slots[s] for s in self.slots if self.filled_slots[s] is not None]
+        draft_ovrs = [p.get("over", 70) for p in starting_xi]
+        team_ovr = int(sum(draft_ovrs) / len(starting_xi)) if starting_xi else 70
+        
+        # Química da equipe atual
+        p1_chem = calculate_chemistry_bonus(starting_xi, "4-3-3") if starting_xi else {}
+        
+        loop = asyncio.get_running_loop()
+        buffer = await loop.run_in_executor(
+            None,
+            generate_team_pitch,
+            starting_xi,
+            "4-3-3",
+            profile.get("club_name", "FC VLS"),
+            profile.get("money", 0),
+            team_ovr,
+            p1_chem
+        )
+        buffer.seek(0)
+        file = discord.File(buffer, filename="pitch.png")
+        
         embed = discord.Embed(
             title="🎮 MODO 7-0 — Draft de Elenco",
             description=(
@@ -2310,15 +2366,16 @@ class DraftView(discord.ui.View):
             ),
             color=discord.Color.purple()
         )
+        embed.set_image(url="attachment://pitch.png")
         embed.set_footer(text="VLS Arena • Draft interactivo")
         
         if interaction.response.is_done():
-            await interaction.message.edit(embed=embed, view=self)
+            await interaction.message.edit(embed=embed, view=self, attachments=[file])
         else:
             try:
-                await interaction.response.edit_message(embed=embed, view=self)
+                await interaction.response.edit_message(embed=embed, view=self, attachments=[file])
             except Exception:
-                await interaction.edit_original_response(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self, attachments=[file])
 
     async def finish_draft(self, interaction: discord.Interaction):
         self.clear_items()

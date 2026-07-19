@@ -25,14 +25,29 @@ VLS_COINS_EMOJI = '<:VLScoins:1517258837004914848>'
 
 async def calculate_price(player: dict) -> int:
     over = player.get("over", 75)
-    base = max(5000, (over - 50) * 15000)
+    
+    fixed_prices = {
+        77: 50000,
+        78: 120000,
+        79: 250000,
+        80: 600000,
+        81: 1300000,
+        82: 1900000,
+        83: 3000000,
+        84: 5000000,
+        85: 10000000
+    }
 
-    if over >= 84:
-        base = base * 1.85
-    elif 80 <= over <= 83:
-        base = base * 1.15
+    if over in fixed_prices:
+        base = fixed_prices[over]
     else:
-        base = base * 0.40
+        base = max(5000, (over - 50) * 15000)
+        if over >= 84:
+            base = base * 1.85
+        elif 80 <= over <= 83:
+            base = base * 1.15
+        else:
+            base = base * 0.40
 
     col_id = player.get("col_id")
     col_pct = 0
@@ -630,8 +645,6 @@ class EconomyCog(commands.Cog, name="Economia"):
 
     @app_commands.command(name="upar_torcida", description="Melhora o nível da sua torcida para apoiar mais o seu time nos jogos.")
     async def upar_torcida(self, interaction: discord.Interaction):
-        if interaction.user.id != 338704196180115458:
-            return await interaction.response.send_message("❌ Este comando está em fase de testes e indisponível no momento.", ephemeral=True)
         profile = await get_user_profile(interaction.user)
         torcida_level = profile.get("torcida_level", 1)
         

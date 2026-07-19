@@ -980,9 +980,6 @@ class MatchesCog(commands.Cog, name="Partidas"):
     @app_commands.command(name="modo_7-0", description="Jogue o modo draft 7-0: monte um time de 11 jogadores e jogue 7 partidas contra a CPU!")
     @lock_user()
     async def modo_7_0(self, interaction: discord.Interaction):
-        if interaction.user.id != 338704196180115458:
-            return await interaction.response.send_message("❌ Este comando está em fase de testes e indisponível no momento.", ephemeral=True)
-            
         await interaction.response.defer()
         
         # Cooldown desativado por solicitação (sem limites)

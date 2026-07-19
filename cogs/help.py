@@ -295,8 +295,6 @@ class HelpCog(commands.Cog, name="Ajuda"):
 
     @app_commands.command(name="playstyle", description="Mostra detalhes e efeitos de todos os Playstyles em jogo.")
     async def playstyle(self, interaction: discord.Interaction):
-        if interaction.user.id != 338704196180115458:
-            return await interaction.response.send_message("❌ Este comando está em fase de testes e indisponível no momento.", ephemeral=True)
         embed = discord.Embed(
             title="✨ Catálogo de Playstyles - VLS Guru",
             description="Selecione um Playstyle no menu abaixo para ver sua descrição detalhada, efeitos em jogo e narrações correspondentes.",

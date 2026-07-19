@@ -245,6 +245,8 @@ class GiveawayCog(commands.Cog, name="Sorteios"):
         app_commands.Choice(name="Dinheiro (R$)", value="dinheiro")
     ])
     async def sorteio_criar(self, interaction: discord.Interaction, tipo: str, premio: str, duracao: str, apenas_boosters: bool = False):
+        if interaction.user.id != 338704196180115458:
+            return await interaction.response.send_message("❌ Este comando está em fase de testes e indisponível no momento.", ephemeral=True)
         if interaction.user.id not in ALLOWED_ADMIN_IDS:
             return await interaction.response.send_message("❌ Apenas administradores do bot podem criar sorteios.", ephemeral=True)
 

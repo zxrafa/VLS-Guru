@@ -630,6 +630,8 @@ class EconomyCog(commands.Cog, name="Economia"):
 
     @app_commands.command(name="upar_torcida", description="Melhora o nível da sua torcida para apoiar mais o seu time nos jogos.")
     async def upar_torcida(self, interaction: discord.Interaction):
+        if interaction.user.id != 338704196180115458:
+            return await interaction.response.send_message("❌ Este comando está em fase de testes e indisponível no momento.", ephemeral=True)
         profile = await get_user_profile(interaction.user)
         torcida_level = profile.get("torcida_level", 1)
         

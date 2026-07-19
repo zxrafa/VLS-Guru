@@ -503,7 +503,7 @@ class MarketCog(commands.Cog, name="Mercado"):
             )
             
         view = OfertasView(interaction.user.id, offers["players"])
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
 
 
 # ── Multi-Sell: vender vários jogadores de uma vez ────────────────────────────
@@ -703,7 +703,7 @@ class OfertasSelect(discord.ui.Select):
                 inline=True
             )
             
-        await interaction.edit_original_response(embed=embed)
+        await interaction.message.edit(embed=embed)
 
 
 class OfertasView(discord.ui.View):

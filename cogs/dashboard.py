@@ -110,6 +110,7 @@ class DashboardCog(commands.Cog, name="Dashboard"):
         embed.add_field(name="💰 Economia", value="Adicionar/remover dinheiro e VLS Coins de membros.", inline=True)
         embed.add_field(name="👥 Usuários", value="Dar ou retirar jogadores do inventário de um membro.", inline=True)
         embed.add_field(name="🛍️ Loja Custom", value="Criar e gerenciar produtos e pacotes personalizados.", inline=True)
+        embed.add_field(name="📡 Canais", value="Configurar canais específicos para anúncios (Mitadas, etc.).", inline=True)
         embed.set_footer(text="VLS Guru Admin • Apenas administradores")
 
         view = CategorySelectView(interaction.user.id)
@@ -137,6 +138,7 @@ class CategoryDropdown(discord.ui.Select):
             discord.SelectOption(label="💰 Economia",   value="economia",   description="Gerenciar saldo dos membros"),
             discord.SelectOption(label="👥 Usuários",   value="usuarios",   description="Distribuir/retirar jogadores"),
             discord.SelectOption(label="🛍️ Loja",       value="loja",       description="Gerenciar produtos personalizados"),
+            discord.SelectOption(label="📡 Canais",     value="canais",     description="Configurar canais do sistema (Mitadas, etc.)"),
         ]
         super().__init__(placeholder="Selecione uma categoria...", options=options)
 
@@ -157,10 +159,66 @@ class CategoryDropdown(discord.ui.Select):
             embed, view = build_usuarios_panel(self.owner_id)
         elif cat == "loja":
             embed, view = build_loja_panel(self.owner_id)
+        elif cat == "canais":
+            settings = await db_get("settings_channels")
+            data = settings["data"] if settings else {}
+            mitadas_id = data.get("mitadas_channel_id")
+            
+            mitadas_mention = f"<#{mitadas_id}>" if mitadas_id else "*Não configurado (Padrão: #mitadas)*"
+            
+            embed = discord.Embed(
+                title="📡 Configuração de Canais",
+                description=(
+                    "Configure os canais específicos para os eventos do bot.\n\n"
+                    f"📢 **Canal de Mitadas Atual:** {mitadas_mention}\n"
+                ),
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="← Voltar: selecione outra categoria abaixo")
+            
+            view = discord.ui.View(timeout=180)
+            view.add_item(MitadasChannelSelect(self.owner_id))
+            view.add_item(CategoryDropdown(self.owner_id))
         else:
             return await interaction.response.defer()
 
         await interaction.response.edit_message(embed=embed, view=view)
+
+
+class MitadasChannelSelect(discord.ui.ChannelSelect):
+    def __init__(self, owner_id: int):
+        super().__init__(
+            placeholder="Selecione o canal para anúncio de Mitadas...",
+            channel_types=[discord.ChannelType.text],
+            row=0
+        )
+        self.owner_id = owner_id
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+            
+        await interaction.response.defer()
+        selected_channel = self.values[0]
+        
+        # Salva no banco de dados
+        settings = await db_get("settings_channels")
+        data = settings["data"] if settings else {}
+        data["mitadas_channel_id"] = selected_channel.id
+        await db_upsert("settings_channels", data)
+        
+        embed = discord.Embed(
+            title="📡 Configuração de Canais",
+            description=(
+                "Configure os canais específicos para os eventos do bot.\n\n"
+                f"📢 **Canal de Mitadas Atual:** {selected_channel.mention}\n"
+            ),
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="← Voltar: selecione outra categoria abaixo")
+        
+        # Mantém a mesma view para continuar configurando
+        await interaction.edit_original_response(embed=embed, view=self.view)
 
 
 # ══════════════════════════════════════════════════════════

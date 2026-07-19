@@ -217,7 +217,7 @@ class EconomyCog(commands.Cog, name="Economia"):
         custom_products = await db_get_prefix("loja_produto_")
         view = LojaView(interaction.user, all_players, custom_products, cog=self)
         embed = await view.make_category_embed()
-        await interaction.followup.send(embed=embed, view=view)
+        await interaction.edit_original_response(embed=embed, view=view)
 
     @app_commands.command(name="caixa", description="Abre uma caixa misteriosa grátis a cada 8 horas.")
     @lock_user()
@@ -229,13 +229,18 @@ class EconomyCog(commands.Cog, name="Economia"):
         if last_sobre > now:
             last_sobre = 0
 
-        # Cooldown de 8 horas
-        if now - last_sobre < 28800:
-            restante = 28800 - (now - last_sobre)
+        # Cooldown de 8 horas (4 horas para boosters)
+        is_booster = getattr(interaction.user, "premium_since", None) is not None
+        cooldown = 14400 if is_booster else 28800
+        if now - last_sobre < cooldown:
+            restante = cooldown - (now - last_sobre)
             horas = int(restante // 3600)
             minutos = int((restante % 3600) // 60)
+            segundos = int(restante % 60)
+            booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
+            time_str = f"{horas}h {minutos}m" if horas > 0 else f"{minutos}m {segundos}s"
             return await interaction.response.send_message(
-                f"⏳ Aguarde mais **{horas}h {minutos}m** para abrir outra caixa.", ephemeral=True
+                f"⏳ {booster_msg}Aguarde mais **{time_str}** para abrir outra caixa.", ephemeral=True
             )
 
         await interaction.response.defer()
@@ -309,13 +314,19 @@ class EconomyCog(commands.Cog, name="Economia"):
         if extras > 0:
             usar_extra = True
         elif now - last_roleta < 86400:
-            restante = 86400 - (now - last_roleta)
-            horas = int(restante // 3600)
-            minutos = int((restante % 3600) // 60)
-            return await interaction.response.send_message(
-                f"⏳ Você já girou a roleta hoje! Aguarde mais **{horas}h {minutos}m** ou consiga um Giro Extra.",
-                ephemeral=True
-            )
+            is_booster = getattr(interaction.user, "premium_since", None) is not None
+            cooldown = 43200 if is_booster else 86400
+            if now - last_roleta < cooldown:
+                restante = cooldown - (now - last_roleta)
+                horas = int(restante // 3600)
+                minutos = int((restante % 3600) // 60)
+                segundos = int(restante % 60)
+                booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
+                time_str = f"{horas}h {minutos}m" if horas > 0 else f"{minutos}m {segundos}s"
+                return await interaction.response.send_message(
+                    f"⏳ {booster_msg}Você já girou a roleta hoje! Aguarde mais **{time_str}** ou consiga um Giro Extra.",
+                    ephemeral=True
+                )
             
         await interaction.response.defer()
         
@@ -393,13 +404,16 @@ class EconomyCog(commands.Cog, name="Economia"):
             profile = await get_user_profile(interaction.user)
             now = datetime.now().timestamp()
 
-            # Cooldown de 10 minutos
-            if now - profile.get("last_claim", 0) < 600:
-                restante = 600 - (now - profile.get("last_claim", 0))
+            # Cooldown de 10 minutos (5 minutos para boosters)
+            is_booster = getattr(interaction.user, "premium_since", None) is not None
+            cooldown = 300 if is_booster else 600
+            if now - profile.get("last_claim", 0) < cooldown:
+                restante = cooldown - (now - profile.get("last_claim", 0))
                 minutos = int(restante // 60)
                 segundos = int(restante % 60)
+                booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
                 return await interaction.followup.send(
-                    f"⏳ Olheiros ainda em campo! Aguarde **{minutos}m {segundos}s**."
+                    f"⏳ {booster_msg}Olheiros ainda em campo! Aguarde **{minutos}m {segundos}s**."
                 )
 
             players_data = await get_all_players()
@@ -487,6 +501,62 @@ class EconomyCog(commands.Cog, name="Economia"):
         
         view.message = msg
 
+        # Anúncio de Mitada (OVR >= 83)
+        if obtido.get("over", 0) >= 83:
+            try:
+                import os
+                import hashlib
+                guild = interaction.guild
+                if guild:
+                    mitadas_channel = None
+                    chan_settings = await db_get("settings_channels")
+                    if chan_settings and "mitadas_channel_id" in chan_settings["data"]:
+                        mitadas_channel = guild.get_channel(chan_settings["data"]["mitadas_channel_id"])
+                        if not mitadas_channel:
+                            try:
+                                mitadas_channel = await guild.fetch_channel(chan_settings["data"]["mitadas_channel_id"])
+                            except Exception:
+                                pass
+                                
+                    if not mitadas_channel:
+                        mitadas_channel = discord.utils.get(guild.channels, name="mitadas") or discord.utils.get(guild.channels, name="geral-mitadas")
+                        
+                    if mitadas_channel:
+                        col_emoji_tag = obtido.get("col_emoji", "✨")
+                        embed_mitada = discord.Embed(
+                            title="🔥 MITADA HISTÓRICA NO RECRUTAR! 🔥",
+                            description=f"O manager {interaction.user.mention} acaba de mitar e tirou uma carta acima de **83 OVR**!\n\n"
+                                        f"🏃 Atleta: {col_emoji_tag} **{obtido['name']}**\n"
+                                        f"⭐ Rated: **{obtido['over']}**\n"
+                                        f"⚽ Posição: **{obtido['pos']}**\n"
+                                        f"🌌 Coleção: **{obtido.get('col_nome', 'Comum')}**",
+                            color=discord.Color.gold()
+                        )
+                        embed_mitada.set_thumbnail(url=interaction.user.display_avatar.url)
+                        
+                        # Tratamento da imagem do card
+                        if card_path:
+                            if card_path.startswith("http://") or card_path.startswith("https://"):
+                                url_hash = hashlib.md5(card_path.encode("utf-8")).hexdigest()
+                                local_cache_path = os.path.join("cache_cartas", f"{url_hash}.png")
+                                if os.path.exists(local_cache_path):
+                                    file_mitada = discord.File(local_cache_path, filename="card_mitada.png")
+                                    embed_mitada.set_image(url="attachment://card_mitada.png")
+                                    await mitadas_channel.send(embed=embed_mitada, file=file_mitada)
+                                else:
+                                    embed_mitada.set_image(url=card_path)
+                                    await mitadas_channel.send(embed=embed_mitada)
+                            elif os.path.exists(card_path):
+                                file_mitada = discord.File(card_path, filename="card_mitada.png")
+                                embed_mitada.set_image(url="attachment://card_mitada.png")
+                                await mitadas_channel.send(embed=embed_mitada, file=file_mitada)
+                            else:
+                                await mitadas_channel.send(embed=embed_mitada)
+                        else:
+                            await mitadas_channel.send(embed=embed_mitada)
+            except Exception as me:
+                print(f"Erro ao anunciar mitada: {me}")
+
     @app_commands.command(name="transferir", description="Transfere fundos para outro membro (limite: R$ 100.000 por vez).")
     @app_commands.describe(usuario="Usuário que receberá os fundos", valor="Quantidade a transferir", tipo="Tipo de moeda")
     @app_commands.choices(tipo=[
@@ -556,6 +626,31 @@ class EconomyCog(commands.Cog, name="Economia"):
         await interaction.response.send_message(
             f"🔎 **Upgrade de Olheiro!** Nível aumentado de **{scout_level}** para **{scout_level + 1}**.\n"
             f"💸 Custo: R$ {cost:,} | Multiplicador de sorte no `/recrutar` atualizado."
+        )
+
+    @app_commands.command(name="upar_torcida", description="Melhora o nível da sua torcida para apoiar mais o seu time nos jogos.")
+    async def upar_torcida(self, interaction: discord.Interaction):
+        profile = await get_user_profile(interaction.user)
+        torcida_level = profile.get("torcida_level", 1)
+        
+        TORCIDA_LEVEL_MAX = 20
+        if torcida_level >= TORCIDA_LEVEL_MAX:
+            return await interaction.response.send_message("❌ Sua torcida já se encontra no nível máximo (20).", ephemeral=True)
+            
+        cost = torcida_level * 50000
+        if torcida_level == 1:
+            cost = 25000  # Custo inicial
+            
+        if profile.get("money", 0) < cost:
+            return await interaction.response.send_message(f"❌ Saldo de dinheiro insuficiente. Custo de upgrade: R$ {cost:,}.", ephemeral=True)
+            
+        profile["money"] -= cost
+        profile["torcida_level"] = torcida_level + 1
+        
+        await save_user_profile(interaction.user.id, profile)
+        await interaction.response.send_message(
+            f"📣 **Upgrade de Torcida!** Nível aumentado de **{torcida_level}** para **{torcida_level + 1}**.\n"
+            f"💸 Custo: R$ {cost:,} | Sua torcida apoiará com mais vigor reduzindo penalidades e aumentando bônus!"
         )
 
     @app_commands.command(name="missoes", description="Exibe suas missões ativas com progresso em tempo real.")

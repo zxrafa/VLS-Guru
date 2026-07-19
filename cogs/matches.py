@@ -11,6 +11,8 @@ from discord import app_commands
 import random
 import time
 import asyncio
+import uuid
+from datetime import datetime
 
 from database import (
     get_user_profile, save_user_profile,
@@ -24,6 +26,7 @@ from config import VLS_COINS_EMOJI
 class MatchesCog(commands.Cog, name="Partidas"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.active_drafts = {}
 
     # ──────────────────────────────────────────────────────────────────────────
     # HELPER: Processamento Pós-Jogo
@@ -255,37 +258,54 @@ class MatchesCog(commands.Cog, name="Partidas"):
         p2_ovr = sum(p.get("over", 0) for p in p2_xi) // len(p2_xi) if p2_xi else 0
 
         try:
-            from pitch_generator import generate_team_pitch
+            # Revela titulares por escrito, 1 por 1, mostrando: Coleção, Rated, Posição e Nome de cada lado
+            p1_by_pos = {p.get("pos"): p for p in p1_xi if p.get("pos")}
+            p2_by_pos = {p.get("pos"): p for p in p2_xi if p.get("pos")}
             
-            buf_p1 = await asyncio.to_thread(
-                generate_team_pitch,
-                starting_xi=p1_xi,
-                formation=p1_form,
-                club_name=p1_name,
-                money=0,
-                overall=p1_ovr,
-                chemistry_bonuses=p1_chem
+            from formations_coordinates import FORMATIONS
+            slots = list(FORMATIONS.get(p1_form, FORMATIONS["4-3-3"]).keys())
+            
+            reveal_msg = await interaction.followup.send("📋 **Escalações Oficiais — Preparando a revelação dos times...**")
+            
+            def format_revealed_player(p: dict) -> str:
+                if not p:
+                    return "*[Vazio]*"
+                col_emoji = p.get("col_emoji", "✨")
+                over = p.get("over", "?")
+                pos = p.get("pos", "?")
+                name = p.get("name", "Jogador")
+                return f"{col_emoji} **{over}** {pos} - *{name}*"
+
+            revealed_lines = []
+            for i, slot in enumerate(slots):
+                p1_p = p1_by_pos.get(slot)
+                p2_p = p2_by_pos.get(slot)
+                
+                p1_str = format_revealed_player(p1_p)
+                p2_str = format_revealed_player(p2_p)
+                
+                line = f"`[{slot}]` {p1_str} 🆚 {p2_str}"
+                revealed_lines.append(line)
+                
+                embed_reveal = discord.Embed(
+                    title=f"📋 Escalações Oficiais — {p1_name} x {p2_name}",
+                    description=f"**Esquemas:** {p1_form} 🆚 {p2_form}\n\n" + "\n".join(revealed_lines),
+                    color=discord.Color.blue()
+                )
+                embed_reveal.set_footer(text=f"Transmissão ao vivo • Revelando titulares... ({i+1}/11)")
+                await reveal_msg.edit(content="", embed=embed_reveal)
+                await asyncio.sleep(1.0)
+                
+            # Altera rodapé ao finalizar
+            embed_reveal = discord.Embed(
+                title=f"📋 Escalações Oficiais — {p1_name} x {p2_name}",
+                description=f"**Esquemas:** {p1_form} 🆚 {p2_form}\n\n" + "\n".join(revealed_lines),
+                color=discord.Color.blue()
             )
-            
-            buf_p2 = await asyncio.to_thread(
-                generate_team_pitch,
-                starting_xi=p2_xi,
-                formation=p2_form,
-                club_name=p2_name,
-                money=0,
-                overall=p2_ovr,
-                chemistry_bonuses=p2_chem
-            )
-            
-            file_p1 = discord.File(fp=buf_p1, filename="p1_pitch.png")
-            file_p2 = discord.File(fp=buf_p2, filename="p2_pitch.png")
-            
-            await interaction.followup.send(
-                content=f"📋 **Escalações Oficiais — {p1_name} x {p2_name}**",
-                files=[file_p1, file_p2]
-            )
+            embed_reveal.set_footer(text="Titulares revelados! Fim da preleção, bola vai rolar!")
+            await reveal_msg.edit(embed=embed_reveal)
         except Exception as e:
-            print(f"Erro ao gerar imagens das escalações antes do jogo: {e}")
+            print(f"Erro ao exibir revelação das escalações por escrito: {e}")
             
         msg = await interaction.followup.send(embed=embed_pre)
         await asyncio.sleep(6.0)
@@ -495,14 +515,17 @@ class MatchesCog(commands.Cog, name="Partidas"):
 
         now      = int(time.time())
         last_t   = profile.get("last_treino", 0)
-        cooldown = 300  # 5 minutos
+        # Cooldown de 5 minutos (2.5 minutos para boosters)
+        is_booster = getattr(interaction.user, "premium_since", None) is not None
+        cooldown = 150 if is_booster else 300
 
         if now - last_t < cooldown:
             remaining = cooldown - (now - last_t)
             minutos = remaining // 60
             segundos = remaining % 60
+            booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
             return await interaction.followup.send(
-                f"⏳ Seu elenco ainda está em recuperação. Aguarde **{minutos}m {segundos}s** para o próximo treino.",
+                f"⏳ {booster_msg}Seu elenco ainda está em recuperação. Aguarde **{minutos}m {segundos}s** para o próximo treino.",
                 ephemeral=True,
             )
 
@@ -593,7 +616,9 @@ class MatchesCog(commands.Cog, name="Partidas"):
             p1_chem   = p1_chem,
             p2_chem   = cpu_chem,
             p1_formation = profile.get("formation", "4-3-3"),
-            p2_formation = "4-3-3"
+            p2_formation = "4-3-3",
+            p1_torcida_level = profile.get("torcida_level", 1),
+            p2_torcida_level = 1,
         )
 
         # Recompensa fixa de treino: R$ 3.000 + +1 XP de afinidade por titular
@@ -894,7 +919,9 @@ class MatchesCog(commands.Cog, name="Partidas"):
                     p1_chem   = p1_chem,
                     p2_chem   = p2_chem,
                     p1_formation = p1_prof.get("formation", "4-3-3"),
-                    p2_formation = "4-3-3"
+                    p2_formation = "4-3-3",
+                    p1_torcida_level = p1_prof.get("torcida_level", 1),
+                    p2_torcida_level = p2_prof.get("torcida_level", 1),
                 )
 
                 m["p1_goals"] = sim["p1_goals"]
@@ -949,6 +976,64 @@ class MatchesCog(commands.Cog, name="Partidas"):
         )
         view = PenaltiTreinoView(interaction.user.id)
         await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="modo_7-0", description="Jogue o modo draft 7-0: monte um time de 11 jogadores e jogue 7 partidas contra a CPU!")
+    @lock_user()
+    async def modo_7_0(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        profile = await get_user_profile(interaction.user)
+        now = time.time()
+        
+        # Cooldown diário: 24 horas (12 horas para boosters)
+        last_modo = profile.get("last_modo_7_0", 0)
+        is_booster = getattr(interaction.user, "premium_since", None) is not None
+        cooldown = 43200 if is_booster else 86400
+        
+        if now - last_modo < cooldown:
+            restante = cooldown - (now - last_modo)
+            horas = int(restante // 3600)
+            minutos = int((restante % 3600) // 60)
+            segundos = int(restante % 60)
+            booster_msg = "⚡ **Bônus Booster ativo!** " if is_booster else ""
+            time_str = f"{horas}h {minutos}m" if horas > 0 else f"{minutos}m {segundos}s"
+            return await interaction.followup.send(
+                f"⏳ {booster_msg}Você já jogou o Modo 7-0 hoje! Aguarde mais **{time_str}** para jogar novamente."
+            )
+            
+        # Registra o início do draft definindo o timestamp do cooldown (anti-cheat)
+        profile["last_modo_7_0"] = now
+        await save_user_profile(interaction.user.id, profile)
+        
+        from database import get_all_players as _get_all_players
+        all_players = await _get_all_players()
+        if not all_players or len(all_players) < 5:
+            return await interaction.followup.send("❌ Não há jogadores catalogados suficientes para jogar o draft.")
+            
+        # Inicializa a sessão de draft
+        view = DraftView(interaction.user.id, all_players, self)
+        await view.roll_options()
+        
+        slot = view.slots[0]
+        embed = discord.Embed(
+            title="🎮 MODO 7-0 — Draft de Elenco",
+            description=(
+                f"Monte sua equipe de 11 jogadores e enfrente 7 adversários!\n\n"
+                f"**Posição Atual:** 🎯 `[{slot}]`\n"
+                f"**Rerolls Restantes:** 🔄 {view.rerolls_left}\n\n"
+                f"**Time Escalado (0/11):**\n"
+                f"*Nenhum jogador selecionado*"
+            ),
+            color=discord.Color.purple()
+        )
+        embed.set_footer(text="VLS Arena • Draft interactivo")
+        
+        # Mostra opções iniciais
+        view.clear_items()
+        view.add_item(DraftDropdown(view.current_options))
+        view.add_item(RerollButton(view.rerolls_left))
+        
+        view.message = await interaction.followup.send(embed=embed, view=view)
 
     @app_commands.command(name="penalti_desafio", description="Desafia outro manager para uma disputa de pênaltis PvP (com ou sem aposta).")
     @app_commands.describe(adversario="Oponente para desafiar", aposta="Valor opcional de aposta em dinheiro")
@@ -1067,7 +1152,9 @@ class MatchesCog(commands.Cog, name="Partidas"):
             p1_chem = p1_chem,
             p2_chem = cpu_chem,
             p1_formation = profile.get("formation", "4-3-3"),
-            p2_formation = "4-3-3"
+            p2_formation = "4-3-3",
+            p1_torcida_level = profile.get("torcida_level", 1),
+            p2_torcida_level = 1,
         )
         
         gols_user = sim_res["p1_goals"]
@@ -1255,7 +1342,9 @@ class ChallengeResponseView(discord.ui.View):
             p1_chem   = p1_chem,
             p2_chem   = p2_chem,
             p1_formation = p1_profile.get("formation", "4-3-3"),
-            p2_formation = "4-3-3"
+            p2_formation = "4-3-3",
+            p1_torcida_level = p1_profile.get("torcida_level", 1),
+            p2_torcida_level = p2_profile.get("torcida_level", 1),
         )
 
         wager_msg = await self.cog.process_match_results(interaction, self.challenger, self.target, sim_res, self.wager)
@@ -1495,7 +1584,9 @@ class CampeonatoAdminView(discord.ui.View):
                 p1_chem = p1_chem,
                 p2_chem = p2_chem,
                 p1_formation = p1_prof.get("formation", "4-3-3"),
-                p2_formation = p2_prof.get("formation", "4-3-3")
+                p2_formation = p2_prof.get("formation", "4-3-3"),
+                p1_torcida_level = p1_prof.get("torcida_level", 1),
+                p2_torcida_level = p2_prof.get("torcida_level", 1),
             )
             
             class MockInteraction:
@@ -1549,7 +1640,9 @@ class CampeonatoAdminView(discord.ui.View):
                 p1_chem = p1_chem,
                 p2_chem = p2_chem,
                 p1_formation = p1_prof.get("formation", "4-3-3"),
-                p2_formation = p2_prof.get("formation", "4-3-3")
+                p2_formation = p2_prof.get("formation", "4-3-3"),
+                p1_torcida_level = p1_prof.get("torcida_level", 1),
+                p2_torcida_level = p2_prof.get("torcida_level", 1),
             )
             
             class MockInteraction:
@@ -1596,7 +1689,9 @@ class CampeonatoAdminView(discord.ui.View):
             p1_chem = p1_chem,
             p2_chem = p2_chem,
             p1_formation = p1_prof.get("formation", "4-3-3"),
-            p2_formation = p2_prof.get("formation", "4-3-3")
+            p2_formation = p2_prof.get("formation", "4-3-3"),
+            p1_torcida_level = p1_prof.get("torcida_level", 1),
+            p2_torcida_level = p2_prof.get("torcida_level", 1),
         )
         
         campeon_id = vencedores_semi[0] if sim_res["p1_goals"] >= sim_res["p2_goals"] else vencedores_semi[1]
@@ -2081,6 +2176,271 @@ class PenaltiAceitarView(discord.ui.View):
         for child in self.children:
             child.disabled = True
         await interaction.response.edit_message(content=f"❌ {self.target.mention} recusou o desafio de pênaltis.", embed=None, view=self)
+
+
+# ── CLASSES AUXILIARES PARA O DRAFT MODO 7-0 ──────────────────────────────────
+
+class DraftDropdown(discord.ui.Select):
+    def __init__(self, options_list: list):
+        select_options = []
+        for idx, p in enumerate(options_list):
+            emoji = p.get("col_emoji", "✨")
+            label = f"{p['name']} (OVR {p['over']} | {p['pos']})"
+            select_options.append(discord.SelectOption(
+                label=label[:100],
+                value=str(idx),
+                description=f"Coleção: {p.get('col_nome', 'Comum')}",
+                emoji=emoji if not emoji.startswith("<") else None
+            ))
+        super().__init__(placeholder="Selecione um jogador para sua equipe...", options=select_options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        view = self.view
+        if interaction.user.id != view.user_id:
+            return await interaction.followup.send("❌ Você não está comandando este draft.", ephemeral=True)
+            
+        selected_idx = int(self.values[0])
+        chosen_player = view.current_options[selected_idx]
+        
+        slot = view.slots[view.current_slot_idx]
+        instanced = chosen_player.copy()
+        instanced["pos"] = slot
+        instanced["instance_id"] = f"draft_{view.current_slot_idx}"
+        view.drafted_team.append(instanced)
+        
+        view.current_slot_idx += 1
+        if view.current_slot_idx < len(view.slots):
+            await view.roll_options()
+            await view.update_message(interaction)
+        else:
+            await view.finish_draft(interaction)
+
+
+class RerollButton(discord.ui.Button):
+    def __init__(self, rerolls_left: int):
+        super().__init__(
+            label=f"Reroll ({rerolls_left} restantes)",
+            style=discord.ButtonStyle.secondary,
+            disabled=(rerolls_left <= 0),
+            emoji="🔄"
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        view = self.view
+        if interaction.user.id != view.user_id:
+            return await interaction.followup.send("❌ Você não está comandando este draft.", ephemeral=True)
+            
+        if view.rerolls_left <= 0:
+            return await interaction.followup.send("❌ Você não possui mais rerolls.", ephemeral=True)
+            
+        view.rerolls_left -= 1
+        await view.roll_options()
+        await view.update_message(interaction)
+
+
+class DraftView(discord.ui.View):
+    def __init__(self, user_id: int, players_pool: list, cog: MatchesCog):
+        super().__init__(timeout=300)
+        self.user_id = user_id
+        self.players_pool = players_pool
+        self.cog = cog
+        
+        self.slots = ["GK", "CB1", "CB2", "LB", "RB", "CDM", "CM1", "CM2", "LW", "RW", "ST"]
+        self.current_slot_idx = 0
+        self.drafted_team = []
+        self.rerolls_left = 2
+        self.current_options = []
+        self.message = None
+
+    async def roll_options(self):
+        slot = self.slots[self.current_slot_idx]
+        
+        if slot == "GK":
+            candidates = [p for p in self.players_pool if p.get("pos") == "GK"]
+        elif slot in ["CB1", "CB2"]:
+            candidates = [p for p in self.players_pool if p.get("pos") in ["CB", "LB", "RB"]]
+        elif slot == "LB":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["LB", "LWB", "CB"]]
+        elif slot == "RB":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["RB", "RWB", "CB"]]
+        elif slot == "CDM":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["CDM", "CM", "CB"]]
+        elif slot in ["CM1", "CM2"]:
+            candidates = [p for p in self.players_pool if p.get("pos") in ["CM", "CAM", "CDM", "LM", "RM"]]
+        elif slot == "LW":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["LW", "LM", "RW", "ST", "CF"]]
+        elif slot == "RW":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["RW", "RM", "LW", "ST", "CF"]]
+        elif slot == "ST":
+            candidates = [p for p in self.players_pool if p.get("pos") in ["ST", "CF", "LW", "RW"]]
+        else:
+            candidates = self.players_pool
+            
+        if len(candidates) < 3:
+            candidates = self.players_pool
+            
+        self.current_options = random.sample(candidates, min(3, len(candidates)))
+
+    async def update_message(self, interaction: discord.Interaction):
+        self.clear_items()
+        self.add_item(DraftDropdown(self.current_options))
+        self.add_item(RerollButton(self.rerolls_left))
+        
+        slot = self.slots[self.current_slot_idx]
+        
+        drafted_str = ""
+        for i, p in enumerate(self.drafted_team):
+            emoji = p.get("col_emoji", "✨")
+            drafted_str += f"🔹 `[{self.slots[i]}]` {emoji} **{p['over']}** {p['pos']} - *{p['name']}*\n"
+            
+        embed = discord.Embed(
+            title="🎮 MODO 7-0 — Draft de Elenco",
+            description=(
+                f"Monte sua equipe de 11 jogadores e enfrente 7 adversários!\n\n"
+                f"**Posição Atual:** 🎯 `[{slot}]`\n"
+                f"**Rerolls Restantes:** 🔄 {self.rerolls_left}\n\n"
+                f"**Time Escalado ({len(self.drafted_team)}/11):**\n"
+                f"{drafted_str if drafted_str else '*Nenhum jogador selecionado*'}"
+            ),
+            color=discord.Color.purple()
+        )
+        embed.set_footer(text="VLS Arena • Draft interactivo")
+        await interaction.edit_original_response(embed=embed, view=self)
+
+    async def finish_draft(self, interaction: discord.Interaction):
+        self.clear_items()
+        
+        embed_loading = discord.Embed(
+            title="🎮 MODO 7-0 — Iniciando Simulações",
+            description="⏱️ **Aguarde...** O bot está simulando as 7 partidas contra os times da CPU!",
+            color=discord.Color.gold()
+        )
+        await interaction.edit_original_response(embed=embed_loading, view=None)
+        
+        wins = 0
+        draws = 0
+        losses = 0
+        games_log = []
+        
+        draft_ovrs = [p.get("over", 70) for p in self.drafted_team]
+        avg_ovr = int(sum(draft_ovrs) / 11)
+        
+        p1_chem = calculate_chemistry_bonus(self.drafted_team, "4-3-3")
+        
+        for game_idx in range(1, 8):
+            cpu_positions = ["GK", "CB", "CB", "LB", "RB", "CDM", "CM", "CM", "LW", "RW", "ST"]
+            cpu_xi = []
+            
+            pool = self.players_pool * 3
+            random.shuffle(pool)
+            used_ids = set()
+            
+            for i, pos_s in enumerate(cpu_positions):
+                candidates = [p for p in pool if p.get("id") not in used_ids]
+                if candidates:
+                    base_player = random.choice(candidates[:15])
+                    used_ids.add(base_player.get("id"))
+                else:
+                    base_player = random.choice(pool)
+                
+                cpu_ovr = max(50, min(99, avg_ovr + random.randint(-4, 4)))
+                base_stat = max(50, cpu_ovr - 5)
+                
+                cpu_xi.append({
+                    "instance_id": f"cpu_{i}",
+                    "name": f"CPU {base_player.get('name', 'Jogador')[:12]}",
+                    "over": cpu_ovr,
+                    "pos": pos_s,
+                    "shoot":    base_player.get("shoot", base_stat),
+                    "pass_stat":base_player.get("pass_stat", base_stat),
+                    "dribble":  base_player.get("dribble", base_stat),
+                    "defense":  base_player.get("defense", base_stat),
+                    "physical": base_player.get("physical", base_stat),
+                    "weak_foot":   base_player.get("weak_foot", 3),
+                    "skill_moves": base_player.get("skill_moves", 2),
+                    "playstyles":  [],
+                    "nationality": "CPU",
+                    "club":        "CPU FC",
+                    "xp":          0,
+                })
+                
+            cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+            
+            sim_res = run_match_simulation(
+                p1_name = "Draft Team",
+                p2_name = f"CPU Adversário #{game_idx}",
+                p1_xi = self.drafted_team,
+                p2_xi = cpu_xi,
+                p1_tactic = "padrao",
+                p2_tactic = "padrao",
+                p1_chem = p1_chem,
+                p2_chem = cpu_chem,
+                p1_formation = "4-3-3",
+                p2_formation = "4-3-3",
+                p1_torcida_level = 1,
+                p2_torcida_level = 1,
+            )
+            
+            g_user = sim_res["p1_goals"]
+            g_cpu = sim_res["p2_goals"]
+            
+            if g_user > g_cpu:
+                wins += 1
+                result_emoji = "✅ Vitória"
+            elif g_user == g_cpu:
+                draws += 1
+                result_emoji = "⚪ Empate"
+            else:
+                losses += 1
+                result_emoji = "❌ Derrota"
+                
+            games_log.append(f"🎮 **Jogo #{game_idx}:** Draft Team **{g_user}** x **{g_cpu}** {sim_res['p2_name']} — {result_emoji}")
+            
+        money_prize = 0
+        coins_prize = 0
+        drawn_card = None
+        
+        if wins == 0:
+            money_prize = 5_000
+        elif wins == 1:
+            money_prize = 12_000
+        elif wins == 2:
+            money_prize = 25_000
+        elif wins == 3:
+            money_prize = 45_000
+        elif wins == 4:
+            money_prize = 75_000
+        elif wins == 5:
+            money_prize = 120_000
+            coins_prize = 10
+        elif wins == 6:
+            money_prize = 200_000
+            coins_prize = 25
+        elif wins == 7:
+            money_prize = 400_000
+            coins_prize = 70
+        profile = await get_user_profile(interaction.user)
+        profile["money"] = profile.get("money", 0) + money_prize
+        profile["premium_coins"] = profile.get("premium_coins", 0) + coins_prize
+        
+        await save_user_profile(interaction.user.id, profile)
+        
+        embed_final = discord.Embed(
+            title="🏆 FIM DO MODO 7-0!",
+            description=(
+                f"Manager: {interaction.user.mention}\n"
+                f"Campanha: **{wins} Vitórias / {draws} Empates / {losses} Derrotas**\n\n"
+                f"**Resultado dos confrontos:**\n" + "\n".join(games_log) + "\n\n"
+                f"🎁 **Premiação Recebida:**\n"
+                f"💵 R$ {money_prize:,}\n"
+                f"🪙 {coins_prize} VLS Coins"
+            ),
+            color=discord.Color.green()
+        )
+        embed_final.set_footer(text="Parabéns pela participação no 7-0! Volte amanhã!")
+        await interaction.edit_original_response(embed=embed_final, view=None)
 
 
 async def setup(bot: commands.Bot):

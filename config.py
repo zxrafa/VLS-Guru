@@ -21,6 +21,14 @@ PLAYSTYLE_EMOJIS = {
     "malvadeza": "<:Malvadeza:1517283961762746430>",
     "perde_pressiona": "<:PerdePressiona:1517283755222503615>",
     "ima_no_pe": "<:ImaNoPe:1517283715393257653>",
+    "bola_parada": "<:BolaParada:1527128049068544134>",
+    "interceptacao": "<:Interceptacao:1527128054760083526>",
+    "solidez": "<:Solidez:1527128060501954681>",
+    "soco": "<:Soco:1527128074573971506>",
+    "chapada": "<:Chapada:1527128080563572779>",
+    "achada": "<:Achada:1527128085756117012>",
+    "cabeceio_preciso": "<:CabeceioPreciso:1527128090692681748>",
+    "espalmada": "<:Espalmada:1527128096631816257>",
 }
 
 # Ambientação & Emojis do Jogo

@@ -26,6 +26,23 @@ def get_gemini_api_key() -> str:
     return os.getenv("GEMINI_API_KEY", "").strip()
 
 
+def get_time_context_str() -> str:
+    from datetime import datetime, timezone, timedelta
+    tz_br = timezone(timedelta(hours=-3))
+    now = datetime.now(tz_br)
+    dias_semana = ["segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo"]
+    dia_semana = dias_semana[now.weekday()]
+    meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+    mes_nome = meses[now.month - 1]
+    
+    return (
+        f"CONTEXTO TEMPORAL ATUAL:\n"
+        f"- Data: {now.day:02d} de {mes_nome} de {now.year}\n"
+        f"- Dia da semana: {dia_semana}\n"
+        f"- Horário exato: {now.strftime('%H:%M:%S')} (Horário de Brasília / UTC-3)\n"
+    )
+
+
 class ChatCog(commands.Cog, name="Chat"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -77,14 +94,17 @@ class ChatCog(commands.Cog, name="Chat"):
         # URL do endpoint do Gemini (Lite)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
+        time_context = get_time_context_str()
         system_instruction = (
             "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
             "use linguagem super humana da internet: tudo minúsculo, pouquíssimas ou nenhuma vírgula, "
             "abreviações (pq, tbm, vlw, blz, nd, gnt, etc.). responda no máximo com 1 ou 2 frases curtas. "
             "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
             "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
+            "se perguntarem as horas, o dia, a data ou qual o momento atual, use as informações do contexto temporal fornecidas abaixo de forma bem informal. "
             "se a mensagem do usuário for uma sugestão, relato de bug, ideia ou reclamação, confirme que vai "
-            "guardar/anotar de forma bem informal (ex: 'blz mano vo salvar aq', 'vlw pela ideia blz vo anotar')."
+            "guardar/anotar de forma bem informal (ex: 'blz mano vo salvar aq', 'vlw pela ideia blz vo anotar').\n\n"
+            f"{time_context}"
         )
 
         payload = {
@@ -140,10 +160,11 @@ class ChatCog(commands.Cog, name="Chat"):
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
+        time_context = get_time_context_str()
         system_instruction = (
             "você é o assistente administrativo por inteligência artificial do bot vls guru. "
             "seu dever é analisar os pedidos do administrador master e retornar um JSON estrito para executar a ação desejada no banco de dados, além de responder informalmente. "
-            "\n\n"
+            f"\n\n{time_context}\n"
             "FORMATO DE RETORNO (JSON estrito, não envie nenhum outro texto, markdown, blocos de código ```json ou conversas fora do JSON):\n"
             "{\n"
             '  "action": "NOME_DA_ACAO",\n'

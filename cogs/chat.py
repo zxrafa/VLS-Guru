@@ -13,11 +13,17 @@ import uuid
 from discord.ext import commands
 from datetime import datetime
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from database import db_get, db_upsert, get_user_profile, save_user_profile, get_all_players
 from config import ALLOWED_ADMIN_IDS as ALLOWED_NLP_ADMINS
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 CHAT_CHANNEL_ID = 1524177774682837022
+
+def get_gemini_api_key() -> str:
+    return os.getenv("GEMINI_API_KEY", "").strip()
 
 
 class ChatCog(commands.Cog, name="Chat"):
@@ -63,12 +69,13 @@ class ChatCog(commands.Cog, name="Chat"):
         if all(c in "k" for c in lower_content) or all(c in "ha" for c in lower_content) or all(c in "rs" for c in lower_content):
             return
 
-        if not GEMINI_API_KEY:
+        gemini_api_key = get_gemini_api_key()
+        if not gemini_api_key:
             print("[Chat] Erro: GEMINI_API_KEY não configurada no ambiente/env.")
             return
 
         # URL do endpoint do Gemini (Lite)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
         system_instruction = (
             "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
@@ -127,10 +134,11 @@ class ChatCog(commands.Cog, name="Chat"):
         if not content:
             return await message.reply("eae mano blz? q q manda?")
 
-        if not GEMINI_API_KEY:
+        gemini_api_key = get_gemini_api_key()
+        if not gemini_api_key:
             return await message.reply("❌ erro: GEMINI_API_KEY não foi configurada nas variáveis de ambiente")
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={GEMINI_API_KEY}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
         system_instruction = (
             "você é o assistente administrativo por inteligência artificial do bot vls guru. "

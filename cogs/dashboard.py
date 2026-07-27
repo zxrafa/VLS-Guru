@@ -664,8 +664,9 @@ async def solicitar_foto_e_salvar(interaction: discord.Interaction, pending: dic
                     buf = BytesIO()
                     img.save(buf, format="PNG")
                     buf.seek(0)
+                    imgbb_key = os.getenv("IMGBB_API_KEY", "")
                     resp = requests.post(
-                        "https://api.imgbb.com/1/upload?key=617c898158c94ac25ddaf2491ee7d0b4",
+                        f"https://api.imgbb.com/1/upload?key={imgbb_key}",
                         files={"image": buf.read()},
                         timeout=20
                     )
@@ -826,8 +827,9 @@ class EditarJogadorOpcoesView(discord.ui.View):
                         buf = BytesIO()
                         img.save(buf, format="PNG")
                         buf.seek(0)
+                        imgbb_key = os.getenv("IMGBB_API_KEY", "")
                         resp = requests.post(
-                            "https://api.imgbb.com/1/upload?key=617c898158c94ac25ddaf2491ee7d0b4",
+                            f"https://api.imgbb.com/1/upload?key={imgbb_key}",
                             files={"image": buf.read()},
                             timeout=20
                         )

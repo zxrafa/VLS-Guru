@@ -42,7 +42,7 @@ DISCORD_TOKEN         = os.getenv("DISCORD_TOKEN")
 DISCORD_CLIENT_ID     = os.getenv("DISCORD_CLIENT_ID")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
 DISCORD_REDIRECT_URI  = os.getenv("DISCORD_REDIRECT_URI", "https://vlsleague.squareweb.app/callback")
-IMGBB_API_KEY         = "617c898158c94ac25ddaf2491ee7d0b4"
+IMGBB_API_KEY         = os.getenv("IMGBB_API_KEY", "")
 
 # Sessões web em memória
 WEB_SESSIONS: dict = {}

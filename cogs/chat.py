@@ -43,6 +43,68 @@ def get_time_context_str() -> str:
     )
 
 
+async def load_chat_memory(channel_id: int, max_items: int = 15) -> list[dict]:
+    """Busca o histórico recente de mensagens do canal salvo no Supabase."""
+    try:
+        doc = await db_get(f"chat_memory_{channel_id}")
+        if doc and "data" in doc and "history" in doc["data"]:
+            history = doc["data"]["history"]
+            return history[-max_items:]
+    except Exception as e:
+        print(f"[Chat Memory] Erro ao carregar memória do Supabase: {e}")
+    return []
+
+
+async def save_chat_memory(channel_id: int, user: discord.User | discord.Member, user_msg: str, bot_reply: str, max_items: int = 30):
+    """Salva uma nova interação na memória de média duração do canal no Supabase."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        tz_br = timezone(timedelta(hours=-3))
+        now_str = datetime.now(tz_br).strftime("%Y-%m-%d %H:%M:%S")
+
+        doc = await db_get(f"chat_memory_{channel_id}")
+        history = []
+        if doc and "data" in doc and "history" in doc["data"]:
+            history = doc["data"]["history"]
+
+        entry = {
+            "timestamp": now_str,
+            "user_id": user.id,
+            "user_name": getattr(user, "display_name", str(user)),
+            "username": str(user),
+            "user_message": user_msg,
+            "bot_response": bot_reply
+        }
+
+        history.append(entry)
+        history = history[-max_items:]
+
+        await db_upsert(f"chat_memory_{channel_id}", {
+            "channel_id": channel_id,
+            "history": history,
+            "last_updated": now_str
+        })
+    except Exception as e:
+        print(f"[Chat Memory] Erro ao salvar memória no Supabase: {e}")
+
+
+def format_memory_prompt(history: list[dict]) -> str:
+    """Formata o histórico para ser injetado como memória no prompt do Gemini."""
+    if not history:
+        return "MEMÓRIA RECENTE DE CONVERSAS (SUPABASE): Nenhuma conversa anterior registrada ainda."
+    
+    lines = ["MEMÓRIA RECENTE DE CONVERSAS E HISTÓRICO (SUPABASE):"]
+    for item in history:
+        ts = item.get("timestamp", "")
+        uname = item.get("user_name", "Usuário")
+        uid = item.get("user_id", "")
+        umsg = item.get("user_message", "")
+        breply = item.get("bot_response", "")
+        lines.append(f"- [{ts}] {uname} (ID {uid}): \"{umsg}\" -> Guru respondeu: \"{breply}\"")
+    
+    return "\n".join(lines)
+
+
 class ChatCog(commands.Cog, name="Chat"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -94,6 +156,10 @@ class ChatCog(commands.Cog, name="Chat"):
         # URL do endpoint do Gemini (Lite)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
+        # Carrega a memória de média duração do Supabase
+        history = await load_chat_memory(message.channel.id, max_items=15)
+        memory_context = format_memory_prompt(history)
+
         time_context = get_time_context_str()
         system_instruction = (
             "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
@@ -102,9 +168,9 @@ class ChatCog(commands.Cog, name="Chat"):
             "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
             "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
             "se perguntarem as horas, o dia, a data ou qual o momento atual, use as informações do contexto temporal fornecidas abaixo de forma bem informal. "
-            "se a mensagem do usuário for uma sugestão, relato de bug, ideia ou reclamação, confirme que vai "
-            "guardar/anotar de forma bem informal (ex: 'blz mano vo salvar aq', 'vlw pela ideia blz vo anotar').\n\n"
-            f"{time_context}"
+            "você possui memória de média duração gravada no banco de dados Supabase sobre as conversas anteriores. use a memória abaixo para saber quem falou o quê, lembrar o nome dos usuários (ID e nick), o que conversaram antes, preferências e dúvidas já tiradas.\n\n"
+            f"{time_context}\n\n"
+            f"{memory_context}"
         )
 
         payload = {
@@ -142,6 +208,7 @@ class ChatCog(commands.Cog, name="Chat"):
                                 await self.save_feedback(message.author, content)
 
                             await message.reply(reply_text)
+                            await save_chat_memory(message.channel.id, message.author, content, reply_text)
                 else:
                     err_txt = await resp.text()
                     print(f"Erro Gemini API (Status {resp.status}): {err_txt}")
@@ -160,11 +227,15 @@ class ChatCog(commands.Cog, name="Chat"):
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
+        # Carrega memória admin de média duração do Supabase
+        history = await load_chat_memory(message.channel.id, max_items=10)
+        memory_context = format_memory_prompt(history)
+
         time_context = get_time_context_str()
         system_instruction = (
             "você é o assistente administrativo por inteligência artificial do bot vls guru. "
             "seu dever é analisar os pedidos do administrador master e retornar um JSON estrito para executar a ação desejada no banco de dados, além de responder informalmente. "
-            f"\n\n{time_context}\n"
+            f"\n\n{time_context}\n\n{memory_context}\n\n"
             "FORMATO DE RETORNO (JSON estrito, não envie nenhum outro texto, markdown, blocos de código ```json ou conversas fora do JSON):\n"
             "{\n"
             '  "action": "NOME_DA_ACAO",\n'
@@ -226,12 +297,15 @@ class ChatCog(commands.Cog, name="Chat"):
                                 if action != "none":
                                     err = await self.execute_admin_action(action, params, message.author.id, message)
                                     if err:
+                                        await save_chat_memory(message.channel.id, message.author, content, err)
                                         return await message.reply(err)
 
                                 await message.reply(reply_text)
+                                await save_chat_memory(message.channel.id, message.author, content, reply_text)
                             except Exception as parse_err:
                                 print(f"Erro ao parsear JSON do Gemini Admin: {parse_err}. Raw: {raw_reply}")
                                 await message.reply(raw_reply)
+                                await save_chat_memory(message.channel.id, message.author, content, raw_reply)
                 else:
                     err_txt = await resp.text()
                     print(f"Erro Gemini API Admin (Status {resp.status}): {err_txt}")

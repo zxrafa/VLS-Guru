@@ -105,6 +105,84 @@ def format_memory_prompt(history: list[dict]) -> str:
     return "\n".join(lines)
 
 
+async def load_permanent_memories() -> list[dict]:
+    """Busca as memórias permanentes (fatos que não apagam) salvas no Supabase."""
+    try:
+        doc = await db_get("chat_permanent_memory")
+        if doc and "data" in doc and "memories" in doc["data"]:
+            return doc["data"]["memories"]
+    except Exception as e:
+        print(f"[Permanent Memory] Erro ao carregar memórias do Supabase: {e}")
+    return []
+
+
+async def save_permanent_memory(user: discord.User | discord.Member, fact: str) -> dict:
+    """Salva um fato ou regra permanente no Supabase."""
+    try:
+        from datetime import datetime, timezone, timedelta
+        tz_br = timezone(timedelta(hours=-3))
+        now_str = datetime.now(tz_br).strftime("%Y-%m-%d %H:%M:%S")
+
+        memories = await load_permanent_memories()
+        entry = {
+            "id": f"mem_{uuid.uuid4().hex[:8]}",
+            "timestamp": now_str,
+            "author_id": user.id,
+            "author_name": getattr(user, "display_name", str(user)),
+            "username": str(user),
+            "fact": fact
+        }
+        memories.append(entry)
+        await db_upsert("chat_permanent_memory", {
+            "memories": memories,
+            "last_updated": now_str
+        })
+        return entry
+    except Exception as e:
+        print(f"[Permanent Memory] Erro ao salvar memória permanente no Supabase: {e}")
+        return {}
+
+
+async def delete_permanent_memory(search_term: str) -> int:
+    """Remove memórias permanentes que contenham o termo de busca."""
+    try:
+        memories = await load_permanent_memories()
+        if not memories:
+            return 0
+
+        initial_count = len(memories)
+        filtered = [m for m in memories if search_term.lower() not in m.get("fact", "").lower()]
+        removed_count = initial_count - len(filtered)
+
+        if removed_count > 0:
+            from datetime import datetime, timezone, timedelta
+            tz_br = timezone(timedelta(hours=-3))
+            now_str = datetime.now(tz_br).strftime("%Y-%m-%d %H:%M:%S")
+            await db_upsert("chat_permanent_memory", {
+                "memories": filtered,
+                "last_updated": now_str
+            })
+        return removed_count
+    except Exception as e:
+        print(f"[Permanent Memory] Erro ao remover memória permanente no Supabase: {e}")
+        return 0
+
+
+def format_permanent_memory_prompt(memories: list[dict]) -> str:
+    """Formata as memórias permanentes fixas para o prompt do Gemini."""
+    if not memories:
+        return "MEMÓRIA PERMANENTE FIXA (SUPABASE): Nenhuma memória ou regra permanente fixada ainda."
+    
+    lines = ["MEMÓRIA PERMANENTE FIXA (FATOS E REGRAS QUE VOCÊ NUNCA DEVE ESQUECER, SALVOS POR ADMINS NO SUPABASE):"]
+    for m in memories:
+        ts = m.get("timestamp", "")
+        uname = m.get("author_name", "Admin")
+        fact = m.get("fact", "")
+        lines.append(f"- [Fixado por {uname} em {ts}]: \"{fact}\"")
+    
+    return "\n".join(lines)
+
+
 class ChatCog(commands.Cog, name="Chat"):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -148,6 +226,75 @@ class ChatCog(commands.Cog, name="Chat"):
         if all(c in "k" for c in lower_content) or all(c in "ha" for c in lower_content) or all(c in "rs" for c in lower_content):
             return
 
+        # Verificação de comandos de Memória Permanente ("Não esqueça", "Lembre-se", etc.)
+        lower_raw = content.lower()
+        triggers = ["não esqueça", "nao esqueca", "não se esqueça", "nao se esqueca", "guarde isso", "lembre-se"]
+        
+        is_authorized = (
+            message.author.id in ALLOWED_NLP_ADMINS or 
+            (isinstance(message.author, discord.Member) and message.author.guild_permissions.administrator)
+        )
+
+        if any(t in lower_raw for t in triggers):
+            if not is_authorized:
+                return await message.reply("❌ apenas administradores da liga possuem permissão para fixar memórias permanentes no banco mano!")
+
+            fact_text = content
+            for t in triggers:
+                if t in lower_raw:
+                    idx = lower_raw.find(t)
+                    fact_text = fact_text[idx + len(t):].strip(" :,.-")
+                    break
+
+            if fact_text.lower().startswith("que "):
+                fact_text = fact_text[4:].strip()
+
+            if not fact_text:
+                return await message.reply("❌ diga o que você quer que eu não esqueça! ex: 'não esqueça que a taxa do mercado é 10%'")
+
+            await save_permanent_memory(message.author, fact_text)
+            reply_text = f"blz mano anotado na minha memória permanente do supabase! vo lembrar pra sempre que: '{fact_text}'"
+            await message.reply(reply_text)
+            await save_chat_memory(message.channel.id, message.author, content, reply_text)
+            return
+
+        # Comando para listar memórias permanentes
+        if any(term in lower_raw for term in ["quais são as memórias", "quais memorias", "quais memórias", "listar memórias", "listar memorias"]):
+            if not is_authorized:
+                return await message.reply("❌ apenas administradores da liga podem consultar o banco de memórias permanentes!")
+
+            mems = await load_permanent_memories()
+            if not mems:
+                return await message.reply("não tenho nenhuma memória permanente registrada ainda mano")
+            
+            txt = "📌 **Memórias Permanentes Registradas no Supabase:**\n" + "\n".join([f"- **{m['fact']}** (fixado por {m['author_name']})" for m in mems])
+            return await message.reply(txt[:1950])
+
+        # Comando para apagar memória permanente
+        if any(lower_raw.startswith(t) or f" {t}" in lower_raw for t in ["esqueça ", "esqueca ", "apagar memória ", "apagar memoria "]) and not any(neg in lower_raw for neg in ["não", "nao"]):
+            if not is_authorized:
+                return await message.reply("❌ apenas administradores da liga podem remover memórias permanentes!")
+
+            search_term = content
+            for t in ["esqueça", "esqueca", "apagar memória", "apagar memoria"]:
+                if t in search_term.lower():
+                    idx = search_term.lower().find(t)
+                    search_term = search_term[idx + len(t):].strip(" :,.-")
+                    break
+
+            if search_term.lower().startswith("que "):
+                search_term = search_term[4:].strip()
+
+            if search_term:
+                removed_count = await delete_permanent_memory(search_term)
+                if removed_count > 0:
+                    reply_text = f"blz mano apaguei {removed_count} memória(s) permanente(s) sobre '{search_term}' do banco!"
+                    await message.reply(reply_text)
+                    await save_chat_memory(message.channel.id, message.author, content, reply_text)
+                    return
+                else:
+                    return await message.reply(f"não encontrei nenhuma memória permanente contendo '{search_term}' pra apagar mano")
+
         gemini_api_key = get_gemini_api_key()
         if not gemini_api_key:
             print("[Chat] Erro: GEMINI_API_KEY não configurada no ambiente/env.")
@@ -156,7 +303,10 @@ class ChatCog(commands.Cog, name="Chat"):
         # URL do endpoint do Gemini (Lite)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
-        # Carrega a memória de média duração do Supabase
+        # Carrega as memórias do Supabase (Permanentes e Média Duração)
+        perm_memories = await load_permanent_memories()
+        perm_context = format_permanent_memory_prompt(perm_memories)
+        
         history = await load_chat_memory(message.channel.id, max_items=15)
         memory_context = format_memory_prompt(history)
 
@@ -168,8 +318,9 @@ class ChatCog(commands.Cog, name="Chat"):
             "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
             "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
             "se perguntarem as horas, o dia, a data ou qual o momento atual, use as informações do contexto temporal fornecidas abaixo de forma bem informal. "
-            "você possui memória de média duração gravada no banco de dados Supabase sobre as conversas anteriores. use a memória abaixo para saber quem falou o quê, lembrar o nome dos usuários (ID e nick), o que conversaram antes, preferências e dúvidas já tiradas.\n\n"
+            "você possui memória permanente (fatos fixados por administradores) e memória de média duração salvas no Supabase. use essas informações para responder com total precisão sobre regras, fatos fixados, o que foi conversado antes e preferências.\n\n"
             f"{time_context}\n\n"
+            f"{perm_context}\n\n"
             f"{memory_context}"
         )
 
@@ -227,7 +378,10 @@ class ChatCog(commands.Cog, name="Chat"):
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
         
-        # Carrega memória admin de média duração do Supabase
+        # Carrega memórias do Supabase (Permanentes e Média Duração)
+        perm_memories = await load_permanent_memories()
+        perm_context = format_permanent_memory_prompt(perm_memories)
+
         history = await load_chat_memory(message.channel.id, max_items=10)
         memory_context = format_memory_prompt(history)
 
@@ -235,7 +389,7 @@ class ChatCog(commands.Cog, name="Chat"):
         system_instruction = (
             "você é o assistente administrativo por inteligência artificial do bot vls guru. "
             "seu dever é analisar os pedidos do administrador master e retornar um JSON estrito para executar a ação desejada no banco de dados, além de responder informalmente. "
-            f"\n\n{time_context}\n\n{memory_context}\n\n"
+            f"\n\n{time_context}\n\n{perm_context}\n\n{memory_context}\n\n"
             "FORMATO DE RETORNO (JSON estrito, não envie nenhum outro texto, markdown, blocos de código ```json ou conversas fora do JSON):\n"
             "{\n"
             '  "action": "NOME_DA_ACAO",\n'

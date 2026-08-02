@@ -24,6 +24,68 @@ def format_stars(active_count: int) -> str:
     return ("<:Estrela:1520370719114920016>" * active) + ("<:naoeumaestrelafeliz:1520371319261368411>" * inactive)
 
 
+def is_same_player(p1: dict, p2: dict) -> bool:
+    """Verifica se dois cards representam a mesma pessoa/jogador no jogo."""
+    if not p1 or not p2:
+        return False
+    # 1. Mesma instância de card
+    inst1 = p1.get("instance_id")
+    inst2 = p2.get("instance_id")
+    if inst1 and inst2 and inst1 == inst2:
+        return True
+    
+    # 2. Mesmo ID base de jogador (ex: player_neymar_jr_lw)
+    id1 = p1.get("id")
+    id2 = p2.get("id")
+    if id1 and id2 and id1 == id2:
+        return True
+        
+    # 3. Mesmo nome normalizado de jogador (ex: "Neymar Jr")
+    name1 = str(p1.get("name", "")).strip().lower()
+    name2 = str(p2.get("name", "")).strip().lower()
+    if name1 and name2 and name1 == name2:
+        return True
+
+    return False
+
+
+def sanitize_and_deduplicate_starting_xi(xi: list) -> list:
+    """
+    Garante que o time titular não contenha duplicatas nem do mesmo instance_id
+    nem do mesmo jogador (nome/id base), evitando cartas repetidas.
+    """
+    seen_instances = set()
+    seen_names = set()
+    seen_ids = set()
+    clean_xi = []
+
+    for p in xi:
+        if not isinstance(p, dict):
+            continue
+            
+        inst = p.get("instance_id")
+        pid = p.get("id")
+        name = str(p.get("name", "")).strip().lower()
+
+        if inst and inst in seen_instances:
+            continue
+        if pid and pid in seen_ids:
+            continue
+        if name and name in seen_names:
+            continue
+
+        if inst:
+            seen_instances.add(inst)
+        if pid:
+            seen_ids.add(pid)
+        if name:
+            seen_names.add(name)
+
+        clean_xi.append(p)
+
+    return clean_xi
+
+
 def build_time_embed_and_view(profile: dict, formation: str):
     """Cria o embed e view do /time com botões interativos."""
     tactic_key = profile.get("tactic", "padrao")
@@ -78,6 +140,12 @@ class TeamCog(commands.Cog, name="Equipe"):
         profile = await get_user_profile(interaction.user)
 
         starting_xi = profile.get("starting_xi", [])
+        clean_xi = sanitize_and_deduplicate_starting_xi(starting_xi)
+        if len(clean_xi) != len(starting_xi):
+            profile["starting_xi"] = clean_xi
+            await save_user_profile(interaction.user.id, profile)
+            starting_xi = clean_xi
+
         formation = profile.get("formation", "4-3-3")
         chem_bonuses = calculate_chemistry_bonus(starting_xi, formation)
 
@@ -687,7 +755,22 @@ class TimeView(discord.ui.View):
         def _base(slot: str) -> str:
             return ''.join(c for c in slot if not c.isdigit())
 
-        used_ids = set()
+        used_instances = set()
+        used_player_ids = set()
+        used_player_names = set()
+
+        def _is_available(p: dict) -> bool:
+            inst = p.get("instance_id")
+            pid = p.get("id")
+            name = str(p.get("name", "")).strip().lower()
+            if inst and inst in used_instances:
+                return False
+            if pid and pid in used_player_ids:
+                return False
+            if name and name in used_player_names:
+                return False
+            return True
+
         new_xi = []
 
         for slot_pos in slots:
@@ -699,7 +782,7 @@ class TimeView(discord.ui.View):
             candidates = [
                 p for p in inventory
                 if _player_pos(p) == base_up
-                and p.get("instance_id") not in used_ids
+                and _is_available(p)
             ]
 
             # Camada 2 — posições compatíveis (POSITION_COMPATIBILITY)
@@ -708,7 +791,7 @@ class TimeView(discord.ui.View):
                 candidates = [
                     p for p in inventory
                     if _player_pos(p) in compat
-                    and p.get("instance_id") not in used_ids
+                    and _is_available(p)
                 ]
 
             # Camada 3 — mesmo grupo posicional (DEF / MID / ATK / GK)
@@ -716,7 +799,7 @@ class TimeView(discord.ui.View):
                 candidates = [
                     p for p in inventory
                     if _get_group(_player_pos(p)) == slot_group
-                    and p.get("instance_id") not in used_ids
+                    and _is_available(p)
                 ]
 
             # Camada 4 — qualquer jogador de campo (NUNCA escala GK fora do gol nem mistura grupos)
@@ -729,7 +812,7 @@ class TimeView(discord.ui.View):
                     candidates = [
                         p for p in inventory
                         if _player_pos(p) != "GK"
-                        and p.get("instance_id") not in used_ids
+                        and _is_available(p)
                     ]
 
             if candidates:
@@ -737,8 +820,15 @@ class TimeView(discord.ui.View):
                 player_copy = best.copy()
                 player_copy["pos"] = slot_pos
                 new_xi.append(player_copy)
-                used_ids.add(best["instance_id"])
+                
+                if best.get("instance_id"):
+                    used_instances.add(best["instance_id"])
+                if best.get("id"):
+                    used_player_ids.add(best["id"])
+                if best.get("name"):
+                    used_player_names.add(str(best["name"]).strip().lower())
 
+        new_xi = sanitize_and_deduplicate_starting_xi(new_xi)
         profile["starting_xi"] = new_xi
         await save_user_profile(interaction.user.id, profile)
 
@@ -857,17 +947,20 @@ class PositionSelect(discord.ui.Select):
             profile = await get_user_profile(interaction.user)
             eligible_tags = POSITION_COMPATIBILITY.get(base_pos, [base_pos])
 
-            # IDs já escalados em OUTRAS posições (exceto a posição que estamos trocando)
+            # Jogadores já escalados em OUTRAS posições (exceto a posição que estamos trocando)
             xi = profile.get("starting_xi", [])
-            used_ids = {
-                p["instance_id"] for p in xi
-                if p.get("pos") != chosen_pos and "instance_id" in p
-            }
+            other_players = [p for p in xi if p.get("pos") != chosen_pos]
+
+            used_instances = {p["instance_id"] for p in other_players if p.get("instance_id")}
+            used_player_ids = {p["id"] for p in other_players if p.get("id")}
+            used_player_names = {str(p.get("name", "")).strip().lower() for p in other_players if p.get("name")}
 
             eligible_players = [
                 p for p in profile.get("inventory", [])
                 if p.get("original_pos", p.get("pos", "")).upper() in [t.upper() for t in eligible_tags]
-                and p.get("instance_id") not in used_ids
+                and (not p.get("instance_id") or p["instance_id"] not in used_instances)
+                and (not p.get("id") or p["id"] not in used_player_ids)
+                and (not p.get("name") or str(p["name"]).strip().lower() not in used_player_names)
             ][:25]
 
             if not eligible_players:
@@ -913,14 +1006,17 @@ class PlayerSelect(discord.ui.Select):
             if not chosen:
                 return await interaction.response.send_message("❌ Jogador não localizado no inventário.", ephemeral=True)
 
-            # Remove do slot atual e do slot alvo
-            xi = [p for p in profile.get("starting_xi", []) if p.get("instance_id") != chosen["instance_id"]]
-            xi = [p for p in xi if p.get("pos") != self.target_pos]
+            # Remove do time titular qualquer versão do mesmo jogador E qualquer jogador ocupando a posição alvo
+            xi = [
+                p for p in profile.get("starting_xi", []) 
+                if not is_same_player(p, chosen) and p.get("pos") != self.target_pos
+            ]
 
             chosen_copy = chosen.copy()
             chosen_copy["pos"] = self.target_pos
             xi.append(chosen_copy)
             
+            xi = sanitize_and_deduplicate_starting_xi(xi)
             profile["starting_xi"] = xi
             await save_user_profile(interaction.user.id, profile)
 
@@ -1450,13 +1546,17 @@ class PlayerScaleCarouselView(discord.ui.View):
         player = self.matches[self.current_index]
         profile = await get_user_profile(interaction.user)
         
-        xi = [p for p in profile.get("starting_xi", []) if p.get("instance_id") != player["instance_id"]]
-        xi = [p for p in xi if p.get("pos") != self.target_pos]
+        # Remove do time titular qualquer versão do mesmo jogador E qualquer jogador ocupando a posição alvo
+        xi = [
+            p for p in profile.get("starting_xi", []) 
+            if not is_same_player(p, player) and p.get("pos") != self.target_pos
+        ]
         
         player_copy = player.copy()
         player_copy["pos"] = self.target_pos
         xi.append(player_copy)
         
+        xi = sanitize_and_deduplicate_starting_xi(xi)
         profile["starting_xi"] = xi
         await save_user_profile(interaction.user.id, profile)
         

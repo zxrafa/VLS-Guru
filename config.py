@@ -125,10 +125,36 @@ TACTICS = {
     }
 }
 
+# Mentalidades de Jogo
+MENTALITIES = {
+    "equilibrada": {
+        "name": "Equilibrada",
+        "desc": "Postura tática neutra e equilibrada.",
+        "attack_mult": 1.0,
+        "defense_mult": 1.0,
+        "counter_vulnerability": 1.0
+    },
+    "defensiva": {
+        "name": "Defensiva",
+        "desc": "Foco em solidez defensiva e contenção. Reduz finalizações, mas aumenta desarmes e defesas.",
+        "attack_mult": 0.7,
+        "defense_mult": 1.35,
+        "counter_vulnerability": 0.7
+    },
+    "ofensiva": {
+        "name": "Ofensiva",
+        "desc": "Pressão alta e ataque total. Cria mais chances e finalizações, mas aumenta o risco de tomar gols em transição.",
+        "attack_mult": 1.25,
+        "defense_mult": 0.8,
+        "counter_vulnerability": 1.3
+    }
+}
+
 # Formações Válidas
 FORMATIONS_ALL = [
     "4-3-3", "4-2-4", "4-2-3-1", "4-4-2", "3-5-2", "5-4-1", "3-4-3", "4-1-4-1",
-    "3-2-5", "5-3-2", "5-2-3", "4-1-5"
+    "3-2-5", "5-3-2", "5-2-3", "4-1-5", "3-4-2-1", "3-2-3-2", "4-5-1", "4-1-2-1-2",
+    "4-3-1-2", "3-2-4-1"
 ]
 
 # Configurações do Olheiro

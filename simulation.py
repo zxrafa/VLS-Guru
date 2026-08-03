@@ -265,36 +265,25 @@ def calculate_chemistry_bonus(starting_xi: list, formation: str) -> dict:
     return bonuses
 
 
-def get_player_effective_stats(player: dict, chemistry_bonus: int, tactic: str, stamina: float = 100.0, crowd_mood: str = "alegria", torcida_level: int = 1) -> dict:
+def get_player_effective_stats(player: dict, chemistry_bonus: int, tactic: str, stamina: float = 100.0, crowd_mood: str = "alegria", torcida_level: int = 1, mentality: str = "equilibrada") -> dict:
     """
     Calcula os atributos efetivos de um jogador considerando:
     1. Bônus de Química
     2. Bônus de Afinidade (XP/10)
     3. Penalidade de Estamina
     4. Multiplicadores de Tática
-    5. Reações da Torcida e seu Nível (Upgrades)
+    5. Multiplicadores de Mentalidade (Defensiva / Equilibrada / Ofensiva)
+    6. Reações da Torcida e seu Nível (Upgrades)
     """
     is_gk = player.get("pos") == "GK"
     
     if is_gk:
-        # GK mapping:
-        # div (diving) -> defense
-        # han (handling) -> pass_stat
-        # kic (kicking) -> shoot
-        # ref (reflexes) -> dribble
-        # pos_stat (positioning) -> physical
         raw_shoot = player.get("kic", 75)
         raw_pass = player.get("han", 75)
         raw_dribble = player.get("ref", 75)
         raw_defense = player.get("div", 75)
         raw_physical = player.get("pos_stat", 75)
     else:
-        # Outfield mapping:
-        # sho (shooting) -> shoot
-        # pas (passing) -> pass_stat
-        # dri (dribbling) -> dribble
-        # def (defending) -> defense
-        # phy (physical) -> physical
         raw_shoot = player.get("sho", player.get("shoot", 75))
         raw_pass = player.get("pas", player.get("pass_stat", 75))
         raw_dribble = player.get("dri", player.get("dribble", 75))
@@ -341,6 +330,16 @@ def get_player_effective_stats(player: dict, chemistry_bonus: int, tactic: str, 
     elif t == "park_the_bus":
         eff["defense"] = min(99, int(eff["defense"] * 1.50))
         eff["shoot"]   = max(1,  int(eff["shoot"]   * 0.65))
+
+    # Modificadores de Mentalidade (Defensiva, Equilibrada, Ofensiva)
+    m = (mentality or "equilibrada").lower()
+    if m == "defensiva":
+        eff["defense"]   = min(99, int(eff["defense"]   * 1.35))
+        eff["shoot"]     = max(1,  int(eff["shoot"]     * 0.75))
+    elif m == "ofensiva":
+        eff["shoot"]     = min(99, int(eff["shoot"]     * 1.25))
+        eff["pass_stat"] = min(99, int(eff["pass_stat"] * 1.15))
+        eff["defense"]   = max(1,  int(eff["defense"]   * 0.80))
 
     # Modificadores da torcida (Upgrades reduzem penalidade de vaia e aumentam os bônus)
     if crowd_mood == "vaia":

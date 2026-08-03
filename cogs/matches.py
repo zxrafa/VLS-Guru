@@ -1073,28 +1073,27 @@ class MatchesCog(commands.Cog, name="Partidas"):
         await interaction.response.defer()
         
         profile = await get_user_profile(interaction.user)
-        div = profile.setdefault("liga_div", "Bronze")
+        div = profile.setdefault("liga_div", "Liga Bronze")
         wins = profile.setdefault("liga_wins", 0)
         losses = profile.setdefault("liga_losses", 0)
         
         LIGAS_CONFIG = {
-            "Bronze": {"wins_needed": 3, "losses_cair": None, "ovr_min": 70, "ovr_max": 75, "premio_vitoria": 5_000, "proxima": "Prata", "anterior": None},
-            "Prata": {"wins_needed": 5, "losses_cair": None, "ovr_min": 75, "ovr_max": 79, "premio_vitoria": 8_000, "proxima": "Ouro", "anterior": None},
-            "Ouro": {"wins_needed": 7, "losses_cair": 10, "ovr_min": 80, "ovr_max": 84, "premio_vitoria": 12_000, "proxima": "Esmeralda", "anterior": "Prata"},
-            "Esmeralda": {"wins_needed": 10, "losses_cair": 8, "ovr_min": 84, "ovr_max": 87, "premio_vitoria": 15_000, "proxima": "Diamante", "anterior": "Ouro"},
-            "Diamante": {"wins_needed": 13, "losses_cair": 6, "ovr_min": 87, "ovr_max": 90, "premio_vitoria": 20_000, "proxima": "Icone", "anterior": "Esmeralda"},
-            "Icone": {"wins_needed": 15, "losses_cair": 5, "ovr_min": 90, "ovr_max": 93, "premio_vitoria": 25_000, "proxima": "Dev", "anterior": "Diamante"},
-            "Dev": {"wins_needed": 20, "losses_cair": 3, "ovr_min": 93, "ovr_max": 96, "premio_vitoria": 30_000, "proxima": "VLS", "anterior": "Icone"},
-            "VLS": {"wins_needed": None, "losses_cair": None, "ovr_min": 96, "ovr_max": 99, "premio_vitoria": 40_000, "proxima": None, "anterior": None}
+            "Liga Bronze":   {"wins_needed": 3,  "losses_cair": None, "ovr_min": 65, "ovr_max": 72, "premio_vitoria": 5_000,   "proxima": "Liga Prata",     "anterior": None},
+            "Liga Prata":    {"wins_needed": 5,  "losses_cair": None, "ovr_min": 73, "ovr_max": 77, "premio_vitoria": 10_000,  "proxima": "Liga Ouro",      "anterior": "Liga Bronze"},
+            "Liga Ouro":     {"wins_needed": 7,  "losses_cair": 10,   "ovr_min": 78, "ovr_max": 82, "premio_vitoria": 18_000,  "proxima": "Liga Diamante",  "anterior": "Liga Prata"},
+            "Liga Diamante": {"wins_needed": 9,  "losses_cair": 8,    "ovr_min": 83, "ovr_max": 86, "premio_vitoria": 30_000,  "proxima": "Unity League",   "anterior": "Liga Ouro"},
+            "Unity League":  {"wins_needed": 12, "losses_cair": 6,    "ovr_min": 87, "ovr_max": 89, "premio_vitoria": 50_000,  "proxima": "Elite League",   "anterior": "Liga Diamante"},
+            "Elite League":  {"wins_needed": 15, "losses_cair": 5,    "ovr_min": 90, "ovr_max": 93, "premio_vitoria": 80_000,  "proxima": "Street League",  "anterior": "Unity League"},
+            "Street League": {"wins_needed": 20, "losses_cair": 4,    "ovr_min": 94, "ovr_max": 99, "premio_vitoria": 150_000, "proxima": None,            "anterior": "Elite League"}
         }
         
-        config = LIGAS_CONFIG.get(div, LIGAS_CONFIG["Bronze"])
+        config = LIGAS_CONFIG.get(div, LIGAS_CONFIG["Liga Bronze"])
         
         if acao == "status":
             embed = discord.Embed(
                 title=f"🔥 Modo Liga VLS — {div}",
                 description=(
-                    f"🏆 **Divisão Atual:** Liga **{div}**\n\n"
+                    f"🏆 **Divisão Atual:** **{div}**\n\n"
                     f"📈 **Vitórias consecutivas:** `{wins}` de **{config['wins_needed'] or '—'}** para subir.\n"
                     f"📉 **Derrotas consecutivas:** `{losses}` de **{config['losses_cair'] or '—'}** para cair.\n\n"
                     f"💰 **Prêmio por vitória:** R$ {config['premio_vitoria']:,}\n"
@@ -1114,26 +1113,50 @@ class MatchesCog(commands.Cog, name="Partidas"):
             )
             
         cpu_names = {
-            "Bronze": "Bronze United", "Prata": "Prata FC", "Ouro": "Real Ouro",
-            "Esmeralda": "Esmeralda Athletic", "Diamante": "Diamante City",
-            "Icone": "Icones F.C.", "Dev": "Devs F.C.", "VLS": "VLS All Stars"
+            "Liga Bronze": "Bronze FC", "Liga Prata": "Prata City", "Liga Ouro": "Real Ouro",
+            "Liga Diamante": "Diamante Athletic", "Unity League": "Unity All Stars",
+            "Elite League": "Elite Global F.C.", "Street League": "Street Kings F.C."
         }
         cpu_name = cpu_names.get(div, "CPU Club")
         
+        # Assegura a seleção de cartas reais do banco de dados do bot para o time CPU
+        all_db_players = await get_all_players()
+        matching_db = [p for p in all_db_players if config["ovr_min"] <= p.get("over", 70) <= config["ovr_max"]] if all_db_players else []
+        if not matching_db and all_db_players:
+            matching_db = all_db_players
+
         cpu_xi = []
         posicoes = ["GK", "CB", "CB", "LB", "RB", "CM", "CM", "CAM", "LW", "RW", "ST"]
+        used_cpu_names = set()
+
         for idx, pos in enumerate(posicoes):
-            ovr = random.randint(config["ovr_min"], config["ovr_max"])
-            cpu_xi.append({
-                "instance_id": f"cpu_{idx}",
-                "name": f"CPU {pos} #{idx}",
-                "pos": pos,
-                "over": ovr,
-                "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
-                "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
-                "col_nome": "Comum",
-                "col_emoji": "⚪"
-            })
+            card_found = None
+            if matching_db:
+                pos_cards = [c for c in matching_db if (c.get("original_pos") or c.get("pos", "")).upper() == pos and c.get("name") not in used_cpu_names]
+                if not pos_cards:
+                    pos_cards = [c for c in matching_db if c.get("name") not in used_cpu_names]
+                if not pos_cards:
+                    pos_cards = matching_db
+                card_found = random.choice(pos_cards)
+                used_cpu_names.add(card_found.get("name"))
+
+            if card_found:
+                card_copy = card_found.copy()
+                card_copy["instance_id"] = f"cpu_carreira_{idx}"
+                card_copy["pos"] = pos
+                cpu_xi.append(card_copy)
+            else:
+                ovr = random.randint(config["ovr_min"], config["ovr_max"])
+                cpu_xi.append({
+                    "instance_id": f"cpu_{idx}",
+                    "name": f"CPU {pos} #{idx}",
+                    "pos": pos,
+                    "over": ovr,
+                    "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
+                    "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
+                    "col_nome": "Comum",
+                    "col_emoji": "⚪"
+                })
             
         p1_chem = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
         cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}

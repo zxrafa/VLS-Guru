@@ -88,16 +88,20 @@ def sanitize_and_deduplicate_starting_xi(xi: list) -> list:
 
 def build_time_embed_and_view(profile: dict, formation: str):
     """Cria o embed e view do /time com botões interativos."""
+    from config import MENTALITIES
     tactic_key = profile.get("tactic", "padrao")
     tactic_name = TACTICS.get(tactic_key, TACTICS["padrao"])["name"]
 
+    mentality_key = profile.get("mentality", "equilibrada")
+    mentality_name = MENTALITIES.get(mentality_key, MENTALITIES["equilibrada"])["name"]
+
     embed = discord.Embed(
         title=f"📋 {profile.get('club_name', 'Sem Clube')}",
-        description=f"Formação: **{formation}** | Tática: **{tactic_name}**",
+        description=f"Formação: **{formation}** | Tática: **{tactic_name}** | Mentalidade: **{mentality_name}**",
         color=discord.Color.dark_theme()
     )
     embed.set_image(url="attachment://pitch.png")
-    embed.set_footer(text="Use os botões abaixo para gerenciar sua escalação.")
+    embed.set_footer(text="Use os botões abaixo para gerenciar sua escalação e mentalidade.")
     return embed
 
 
@@ -861,6 +865,13 @@ class TimeView(discord.ui.View):
         view = FormacaoSelectView(self.owner_id)
         await interaction.response.send_message("Selecione a nova formação:", view=view, ephemeral=True)
 
+    @discord.ui.button(label="🧠 Mentalidade", style=discord.ButtonStyle.secondary, row=0)
+    async def mudar_mentalidade(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Apenas o dono pode usar estes botões.", ephemeral=True)
+        view = MentalidadeSelectView(self.owner_id)
+        await interaction.response.send_message("Selecione a nova mentalidade tática:", view=view, ephemeral=True)
+
     @discord.ui.button(label="🗑️ Limpar Escalação", style=discord.ButtonStyle.danger, row=0)
     async def limpar_escalacao(self, interaction: discord.Interaction, button: discord.ui.Button):
         if interaction.user.id != self.owner_id:
@@ -885,6 +896,42 @@ class TimeView(discord.ui.View):
                 content="✅ **Escalação limpa!** Todos os jogadores foram movidos para o banco de reservas.",
                 view=self
             )
+
+
+class MentalidadeSelectView(discord.ui.View):
+    def __init__(self, owner_id: int):
+        super().__init__(timeout=60)
+        self.owner_id = owner_id
+        from config import MENTALITIES
+        options = [
+            discord.SelectOption(
+                label=data["name"],
+                value=key,
+                description=data["desc"][:100]
+            ) for key, data in MENTALITIES.items()
+        ]
+        self.add_item(MentalidadeDropdown(owner_id, options))
+
+
+class MentalidadeDropdown(discord.ui.Select):
+    def __init__(self, owner_id: int, options):
+        self.owner_id = owner_id
+        super().__init__(placeholder="Escolha a mentalidade", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+        chosen = self.values[0]
+        profile = await get_user_profile(interaction.user)
+        profile["mentality"] = chosen
+        await save_user_profile(interaction.user.id, profile)
+
+        from config import MENTALITIES
+        m_info = MENTALITIES.get(chosen, MENTALITIES["equilibrada"])
+        await interaction.response.send_message(
+            f"✅ Mentalidade alterada para **{m_info['name']}**!\n*{m_info['desc']}*",
+            ephemeral=True
+        )
 
 
 class FormacaoSelectView(discord.ui.View):

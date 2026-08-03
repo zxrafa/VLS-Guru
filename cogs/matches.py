@@ -1061,6 +1061,263 @@ class MatchesCog(commands.Cog, name="Partidas"):
         view = PenaltiAceitarView(self, interaction.user, adversario, aposta)
         await interaction.response.send_message(embed=embed, view=view)
 
+    @app_commands.command(name="modo_desafio", description="Enfrente um dos 9 times marcantes e históricos da liga!")
+    @app_commands.describe(time="Escolha o time histórico para enfrentar")
+    @app_commands.choices(time=[
+        app_commands.Choice(name="Real Madrid S0 (Galácticos)", value="real_madrid_s0"),
+        app_commands.Choice(name="Barcelona S0 (Tiki-Taka)", value="barcelona_s0"),
+        app_commands.Choice(name="Milan S1 (Rossoneri)", value="milan_s1"),
+        app_commands.Choice(name="Borussia Dortmund S1 (Muralha Amarela)", value="borussia_s1"),
+        app_commands.Choice(name="Young Boys S1 (Geração de Ouro)", value="young_boys_s1"),
+        app_commands.Choice(name="Arsenal S1 (Gunners)", value="arsenal_s1"),
+        app_commands.Choice(name="Inglaterra S2 (English Lions)", value="inglaterra_s2"),
+        app_commands.Choice(name="França S2 (Les Bleus)", value="franca_s2"),
+        app_commands.Choice(name="Holanda S2 (Laranja Mecânica)", value="holanda_s2"),
+    ])
+    @lock_user()
+    async def modo_desafio(self, interaction: discord.Interaction, time: str):
+        await interaction.response.defer()
+
+        profile = await get_user_profile(interaction.user)
+        starting_xi = profile.get("starting_xi", [])
+        if len(starting_xi) < 11:
+            return await interaction.followup.send(
+                "❌ Você precisa de **11 titulares escalados** no seu `/time` para disputar o Modo Desafio.",
+                ephemeral=True
+            )
+
+        teams_data = {
+            "real_madrid_s0": {
+                "name": "Real Madrid S0",
+                "formation": "4-3-3",
+                "players": [
+                    {"pos": "GK", "name": "Vicarion", "over": 86},
+                    {"pos": "CB", "name": "MiMi", "over": 89},
+                    {"pos": "CB", "name": "Apros", "over": 86},
+                    {"pos": "CM", "name": "Astro", "over": 88},
+                    {"pos": "LW", "name": "Pedro", "over": 87},
+                    {"pos": "RW", "name": "Slicer", "over": 89},
+                    {"pos": "ST", "name": "Dudisz", "over": 89},
+                    {"pos": "LB", "name": "Real LB", "over": 86},
+                    {"pos": "RB", "name": "Real RB", "over": 86},
+                    {"pos": "CM", "name": "Real Mid", "over": 87},
+                    {"pos": "CAM", "name": "Real Cam", "over": 87},
+                ]
+            },
+            "barcelona_s0": {
+                "name": "Barcelona S0",
+                "formation": "4-4-2",
+                "players": [
+                    {"pos": "GK", "name": "Buffon", "over": 86},
+                    {"pos": "CB", "name": "Android", "over": 87},
+                    {"pos": "CB", "name": "Barça CB2", "over": 86},
+                    {"pos": "CM", "name": "MiMi", "over": 89},
+                    {"pos": "LM", "name": "Edu", "over": 88},
+                    {"pos": "RM", "name": "Nat", "over": 87},
+                    {"pos": "ST", "name": "Lacrozz", "over": 86},
+                    {"pos": "ST", "name": "Levi", "over": 86},
+                    {"pos": "LB", "name": "Barça LB", "over": 86},
+                    {"pos": "RB", "name": "Barça RB", "over": 86},
+                    {"pos": "CM", "name": "Barça CM2", "over": 86},
+                ]
+            },
+            "milan_s1": {
+                "name": "Milan S1",
+                "formation": "4-3-3",
+                "players": [
+                    {"pos": "GK", "name": "Ciriloca", "over": 89},
+                    {"pos": "CB", "name": "Ph", "over": 88},
+                    {"pos": "CB", "name": "Italia", "over": 87},
+                    {"pos": "CM", "name": "Golden", "over": 86},
+                    {"pos": "LW", "name": "Astro", "over": 88},
+                    {"pos": "RW", "name": "Samuel", "over": 86},
+                    {"pos": "ST", "name": "Luanzy", "over": 88},
+                    {"pos": "LB", "name": "Milan LB", "over": 87},
+                    {"pos": "RB", "name": "Milan RB", "over": 87},
+                    {"pos": "CM", "name": "Milan CM2", "over": 87},
+                    {"pos": "CAM", "name": "Milan CAM", "over": 87},
+                ]
+            },
+            "borussia_s1": {
+                "name": "Borussia Dortmund S1",
+                "formation": "4-4-2",
+                "players": [
+                    {"pos": "GK", "name": "Pedrodb", "over": 88},
+                    {"pos": "CB", "name": "Ryuk", "over": 87},
+                    {"pos": "CB", "name": "Cartoon", "over": 87},
+                    {"pos": "CM", "name": "Delmu", "over": 85},
+                    {"pos": "CM", "name": "Swaazy", "over": 86},
+                    {"pos": "ST", "name": "Sant", "over": 87},
+                    {"pos": "ST", "name": "Gyanchaves", "over": 88},
+                    {"pos": "LM", "name": "BVB LM", "over": 86},
+                    {"pos": "RM", "name": "BVB RM", "over": 86},
+                    {"pos": "LB", "name": "BVB LB", "over": 86},
+                    {"pos": "RB", "name": "BVB RB", "over": 86},
+                ]
+            },
+            "young_boys_s1": {
+                "name": "Young Boys S1",
+                "formation": "4-4-2",
+                "players": [
+                    {"pos": "GK", "name": "Myru", "over": 83},
+                    {"pos": "CB", "name": "Dudux", "over": 86},
+                    {"pos": "CB", "name": "Central", "over": 87},
+                    {"pos": "CM", "name": "Ronaldinho", "over": 87},
+                    {"pos": "CM", "name": "PGamer", "over": 87},
+                    {"pos": "ST", "name": "Paulo", "over": 89},
+                    {"pos": "ST", "name": "Kzx", "over": 88},
+                    {"pos": "LM", "name": "YB LM", "over": 86},
+                    {"pos": "RM", "name": "YB RM", "over": 86},
+                    {"pos": "LB", "name": "YB LB", "over": 85},
+                    {"pos": "RB", "name": "YB RB", "over": 85},
+                ]
+            },
+            "arsenal_s1": {
+                "name": "Arsenal S1",
+                "formation": "4-3-3",
+                "players": [
+                    {"pos": "GK", "name": "Savkai", "over": 87},
+                    {"pos": "CB", "name": "Itália", "over": 87},
+                    {"pos": "CB", "name": "Apros", "over": 85},
+                    {"pos": "CM", "name": "Sthezz", "over": 87},
+                    {"pos": "LW", "name": "Luccas", "over": 88},
+                    {"pos": "RW", "name": "Albert", "over": 85},
+                    {"pos": "ST", "name": "Dudisz", "over": 88},
+                    {"pos": "LB", "name": "Arsenal LB", "over": 86},
+                    {"pos": "RB", "name": "Arsenal RB", "over": 86},
+                    {"pos": "CM", "name": "Arsenal CM2", "over": 86},
+                    {"pos": "CAM", "name": "Arsenal CAM", "over": 86},
+                ]
+            },
+            "inglaterra_s2": {
+                "name": "Inglaterra S2",
+                "formation": "4-3-3",
+                "players": [
+                    {"pos": "GK", "name": "Tarik", "over": 87},
+                    {"pos": "CB", "name": "Vanys", "over": 87},
+                    {"pos": "CB", "name": "Xao Shuan", "over": 86},
+                    {"pos": "CM", "name": "Gwf", "over": 88},
+                    {"pos": "LW", "name": "Stardust", "over": 88},
+                    {"pos": "ST", "name": "Almy", "over": 89},
+                    {"pos": "RW", "name": "Katapow", "over": 89},
+                    {"pos": "LB", "name": "England LB", "over": 87},
+                    {"pos": "RB", "name": "England RB", "over": 87},
+                    {"pos": "CM", "name": "England CM2", "over": 87},
+                    {"pos": "CAM", "name": "England CAM", "over": 87},
+                ]
+            },
+            "franca_s2": {
+                "name": "França S2",
+                "formation": "4-3-3",
+                "players": [
+                    {"pos": "GK", "name": "Ciriloca", "over": 88},
+                    {"pos": "CB", "name": "Ph", "over": 87},
+                    {"pos": "CB", "name": "Paraguayo", "over": 87},
+                    {"pos": "CM", "name": "Cartoon", "over": 87},
+                    {"pos": "LW", "name": "Astro", "over": 88},
+                    {"pos": "RW", "name": "Rato", "over": 86},
+                    {"pos": "ST", "name": "Dudisz", "over": 88},
+                    {"pos": "LB", "name": "France LB", "over": 87},
+                    {"pos": "RB", "name": "France RB", "over": 87},
+                    {"pos": "CM", "name": "France CM2", "over": 87},
+                    {"pos": "CAM", "name": "France CAM", "over": 87},
+                ]
+            },
+            "holanda_s2": {
+                "name": "Holanda S2",
+                "formation": "4-4-2",
+                "players": [
+                    {"pos": "GK", "name": "Suit", "over": 89},
+                    {"pos": "CB", "name": "Android", "over": 88},
+                    {"pos": "CB", "name": "Lacrozz", "over": 87},
+                    {"pos": "LM", "name": "Luccas", "over": 87},
+                    {"pos": "RM", "name": "Kzx", "over": 89},
+                    {"pos": "ST", "name": "Levi", "over": 87},
+                    {"pos": "ST", "name": "Luanzy", "over": 87},
+                    {"pos": "LB", "name": "Holland LB", "over": 87},
+                    {"pos": "RB", "name": "Holland RB", "over": 87},
+                    {"pos": "CM", "name": "Holland CM1", "over": 87},
+                    {"pos": "CM", "name": "Holland CM2", "over": 87},
+                ]
+            }
+        }
+
+        t_info = teams_data.get(time, teams_data["real_madrid_s0"])
+        cpu_name = t_info["name"]
+        cpu_formation = t_info["formation"]
+
+        cpu_xi = []
+        for idx, p in enumerate(t_info["players"]):
+            ovr = p["over"]
+            cpu_xi.append({
+                "instance_id": f"hist_{idx}",
+                "name": p["name"],
+                "pos": p["pos"],
+                "over": ovr,
+                "pac": ovr, "sho": ovr, "pas": ovr, "dri": ovr, "def": ovr, "phy": ovr,
+                "div": ovr, "han": ovr, "kic": ovr, "ref": ovr, "spd": ovr, "pos_stat": ovr,
+                "col_nome": "Histórico",
+                "col_emoji": "👑"
+            })
+
+        p1_chem = calculate_chemistry_bonus(starting_xi, profile.get("formation", "4-3-3"))
+        cpu_chem = {p["instance_id"]: 0 for p in cpu_xi}
+
+        sim_res = run_match_simulation(
+            p1_name = profile.get("club_name", "Meu Clube"),
+            p2_name = cpu_name,
+            p1_xi = starting_xi,
+            p2_xi = cpu_xi,
+            p1_tactic = profile.get("tactic", "padrao"),
+            p2_tactic = "padrao",
+            p1_chem = p1_chem,
+            p2_chem = cpu_chem,
+            p1_formation = profile.get("formation", "4-3-3"),
+            p2_formation = cpu_formation,
+            p1_torcida_level = profile.get("torcida_level", 1),
+            p2_torcida_level = 1,
+            p1_mentality = profile.get("mentality", "equilibrada"),
+            p2_mentality = "equilibrada"
+        )
+
+        gols_user = sim_res["p1_goals"]
+        gols_cpu = sim_res["p2_goals"]
+
+        if gols_user > gols_cpu:
+            money_earned = 50_000
+            coins_earned = 10
+            profile["money"] += money_earned
+            profile["premium_coins"] = profile.get("premium_coins", 0) + coins_earned
+            profile["desafios_historicos_wins"] = profile.get("desafios_historicos_wins", 0) + 1
+            await save_user_profile(interaction.user.id, profile)
+
+            res_msg = (
+                f"🎉 **VITÓRIA HISTÓRICA!** Você venceu o lendário **{cpu_name}** por **{gols_user} x {gols_cpu}**!\n\n"
+                f"💰 **Premiação:** R$ {money_earned:,} + 💎 10 VLS Coins!"
+            )
+            color = discord.Color.gold()
+        elif gols_user < gols_cpu:
+            res_msg = (
+                f"💔 **DERROTA!** O lendário **{cpu_name}** venceu a partida por **{gols_cpu} x {gols_user}**.\n\n"
+                f"Ajuste sua tática ou escalação e tente novamente!"
+            )
+            color = discord.Color.red()
+        else:
+            res_msg = (
+                f"🤝 **EMPATE TÁTICO!** O confronto terminou empatado em **{gols_user} x {gols_cpu}** contra o **{cpu_name}**.\n\n"
+                f"Nenhum vencedor nesta rodada!"
+            )
+            color = discord.Color.blue()
+
+        narracao = "\n".join(sim_res["events"][:6])
+        embed = discord.Embed(
+            title=f"👑 Modo Desafio Histórico — {cpu_name}",
+            description=f"**Placar Final:** {profile.get('club_name', 'Seu Time')} **{gols_user} x {gols_cpu}** {cpu_name}\n\n{res_msg}\n\n**Principais Momentos:**\n{narracao}",
+            color=color
+        )
+        embed.set_footer(text="VLS Historical Challenge • Modo de Desafios Clássicos")
+        await interaction.followup.send(embed=embed)
+
     # ── MÓDULO 6: MODO LIGA ────────────────────────────────────────────────────
     
     @app_commands.command(name="liga", description="Exibe seu status no Modo Liga e permite simular partidas contra a CPU.")

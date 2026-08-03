@@ -343,7 +343,26 @@ async def api_put_jogador(request: web.Request) -> web.Response:
         "col_id": final_col_id, "col_nome": col_name, "col_emoji": col_emoji,
     })
 
-    # Geração automática desabilitada; a imagem da carta é totalmente customizada.
+    # Atualiza atributos detalhados de linha e goleiro se enviados no painel adm
+    for stat in ("pac", "sho", "pas", "dri", "def", "phy", "div", "han", "kic", "ref", "spd", "pos_stat", "weak_foot", "skill_moves"):
+        if stat in data:
+            try:
+                val = int(data[stat])
+                updated[stat] = val
+                # Mantém sincronizado para goleiros/linha
+                if stat == "pac": updated["div"] = val
+                elif stat == "sho": updated["kic"] = val
+                elif stat == "pas": updated["han"] = val
+                elif stat == "dri": updated["ref"] = val
+                elif stat == "def": updated["pos_stat"] = val
+                elif stat == "phy": updated["spd"] = val
+            except (ValueError, TypeError):
+                pass
+
+    if "playstyles" in data:
+        ps_raw = data.get("playstyles")
+        if isinstance(ps_raw, str):
+            updated["playstyles"] = [p.strip() for p in ps_raw.split(",") if p.strip()]
 
     await db_upsert(player_id, updated)
     return web.json_response({"success": True})

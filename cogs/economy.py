@@ -787,6 +787,169 @@ class EconomyCog(commands.Cog, name="Economia"):
         view = MissoesView(interaction.user.id, combined_missions, mp, profile)
         await interaction.response.send_message(embed=embed, view=view)
 
+    @app_commands.command(name="olheiro_treino", description="Simula uma sessão de observação do Olheiro em um mini-game de pênalti/finalização!")
+    @lock_user()
+    async def olheiro_treino(self, interaction: discord.Interaction):
+        profile = await get_user_profile(interaction.user)
+        now = time.time()
+        last = profile.get("last_olheiro_treino", 0)
+        is_booster = getattr(interaction.user, "premium_since", None) is not None
+        cooldown = 21600 if is_booster else 43200
+
+        if now - last < cooldown:
+            restante = cooldown - (now - last)
+            horas = int(restante // 3600)
+            minutos = int((restante % 3600) // 60)
+            return await interaction.response.send_message(
+                f"⏳ Aguarde mais **{horas}h {minutos}m** para realizar o treino de observação do Olheiro novamente.",
+                ephemeral=True
+            )
+
+        embed = discord.Embed(
+            title="🎯 Treino de Observação do Olheiro",
+            description=(
+                "Seu olheiro encontrou uma promessa em teste cara a cara com o goleiro!\n\n"
+                " Escolha o canto de finalização abaixo. Se acertar o gol, seu olheiro ganha **+1 Nível**, R$ 25.000 e 2 VLS Coins!"
+            ),
+            color=discord.Color.gold()
+        )
+        view = OlheiroTreinoView(interaction.user.id)
+        await interaction.response.send_message(embed=embed, view=view)
+
+    @app_commands.command(name="evento_criar", description="ADM: Inicia um evento de coleção e trava as cartas para caixas/olheiro.")
+    @app_commands.describe(nome_colecao="Nome da coleção a ser travada durante o evento")
+    async def evento_criar(self, interaction: discord.Interaction, nome_colecao: str):
+        from config import ALLOWED_ADMIN_IDS
+        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
+            return await interaction.response.send_message("❌ Apenas administradores podem criar eventos de coleção.", ephemeral=True)
+
+        doc = await db_get("locked_collections")
+        locked = set(doc["data"].get("locked", [])) if doc and "data" in doc else set()
+        locked.add(nome_colecao.strip())
+
+        await db_upsert("locked_collections", {"locked": list(locked), "last_updated": datetime.utcnow().isoformat()})
+        embed = discord.Embed(
+            title="🔒 Evento Iniciado & Coleção Bloqueada!",
+            description=f"A coleção **{nome_colecao}** foi bloqueada com sucesso!\nNenhum jogador conseguirá tirar essas cartas em caixas ou olheiro até o encerramento do torneio.",
+            color=discord.Color.gold()
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="evento_encerrar", description="ADM: Encerra o evento de coleção e libera as cartas nas caixas e olheiro.")
+    @app_commands.describe(nome_colecao="Nome da coleção a ser liberada no sistema")
+    async def evento_encerrar(self, interaction: discord.Interaction, nome_colecao: str):
+        from config import ALLOWED_ADMIN_IDS
+        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
+            return await interaction.response.send_message("❌ Apenas administradores podem encerrar eventos.", ephemeral=True)
+
+        doc = await db_get("locked_collections")
+        locked = set(doc["data"].get("locked", [])) if doc and "data" in doc else set()
+        if nome_colecao.strip() in locked:
+            locked.remove(nome_colecao.strip())
+
+        await db_upsert("locked_collections", {"locked": list(locked), "last_updated": datetime.utcnow().isoformat()})
+        embed = discord.Embed(
+            title="🔓 Evento Encerrado & Coleção Liberada!",
+            description=f"A coleção **{nome_colecao}** foi liberada no sistema!\nAgora todos os jogadores podem encontrá-la nas caixas e no olheiro.",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="sorteio_booster", description="ADM: Realiza o sorteio exclusivo de 2 ganhadores entre os Server Boosters.")
+    async def sorteio_booster(self, interaction: discord.Interaction):
+        from config import ALLOWED_ADMIN_IDS
+        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
+            return await interaction.response.send_message("❌ Apenas administradores podem realizar o sorteio de Boosters.", ephemeral=True)
+
+        guild = interaction.guild
+        if not guild:
+            return await interaction.response.send_message("❌ Comando deve ser executado no servidor.", ephemeral=True)
+
+        boosters = [m for m in guild.members if m.premium_since is not None]
+        if not boosters:
+            return await interaction.response.send_message("❌ Nenhum Server Booster encontrado no servidor no momento.", ephemeral=True)
+
+        ganhadores = random.sample(boosters, min(2, len(boosters)))
+        txt_ganhadores = "\n".join([f"🏆 {m.mention} (`{m.display_name}`)" for m in ganhadores])
+
+        embed = discord.Embed(
+            title="⚡ Sorteio Exclusivo Server Boosters!",
+            description=f"Parabéns aos **2 Ganhadores** do sorteio de Boosters da liga!\n\n{txt_ganhadores}\n\nVocês receberão 1 carta exclusiva da nova coleção!",
+            color=discord.Color.magenta()
+        )
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="admin_editar_jogador", description="ADM: Edita os atributos, OVR ou posição de um jogador no banco de dados.")
+    @app_commands.describe(
+        id_jogador="ID do jogador no banco (ex: player_lionel_messi_rw)",
+        over="Novo OVR (opcional)",
+        pac="Novo Ritmo / DIV (opcional)",
+        sho="Novo Chute / KIC (opcional)",
+        pas="Novo Passe / HAN (opcional)",
+        dri="Novo Drible / REF (opcional)",
+        def_stat="Nova Defesa / POS (opcional)",
+        phy="Novo Físico / SPD (opcional)",
+        pos="Nova Posição (opcional)"
+    )
+    async def admin_editar_jogador(
+        self,
+        interaction: discord.Interaction,
+        id_jogador: str,
+        over: int = None,
+        pac: int = None,
+        sho: int = None,
+        pas: int = None,
+        dri: int = None,
+        def_stat: int = None,
+        phy: int = None,
+        pos: str = None
+    ):
+        from config import ALLOWED_ADMIN_IDS
+        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
+            return await interaction.response.send_message("❌ Apenas administradores podem editar atributos de jogadores.", ephemeral=True)
+
+        rec = await db_get(f"player_{id_jogador.strip()}")
+        if not rec:
+            return await interaction.response.send_message(f"❌ Carta `{id_jogador}` não foi encontrada no banco Supabase.", ephemeral=True)
+
+        card_data = rec["data"]
+        changes = []
+        if over is not None:
+            card_data["over"] = over
+            changes.append(f"OVR -> {over}")
+        if pac is not None:
+            card_data["pac"] = card_data["div"] = pac
+            changes.append(f"PAC -> {pac}")
+        if sho is not None:
+            card_data["sho"] = card_data["kic"] = sho
+            changes.append(f"SHO -> {sho}")
+        if pas is not None:
+            card_data["pas"] = card_data["han"] = pas
+            changes.append(f"PAS -> {pas}")
+        if dri is not None:
+            card_data["dri"] = card_data["ref"] = dri
+            changes.append(f"DRI -> {dri}")
+        if def_stat is not None:
+            card_data["def"] = card_data["pos_stat"] = def_stat
+            changes.append(f"DEF -> {def_stat}")
+        if phy is not None:
+            card_data["phy"] = card_data["spd"] = phy
+            changes.append(f"PHY -> {phy}")
+        if pos is not None:
+            card_data["pos"] = card_data["original_pos"] = pos.upper()
+            changes.append(f"POS -> {pos.upper()}")
+
+        if not changes:
+            return await interaction.response.send_message("⚠️ Nenhum atributo foi informado para alteração.", ephemeral=True)
+
+        await db_upsert(f"player_{id_jogador.strip()}", card_data)
+        embed = discord.Embed(
+            title="✏️ Carta de Jogador Editada com Sucesso!",
+            description=f"Atleta: **{card_data.get('name')}** (`{id_jogador}`)\n\n**Alterações aplicadas:**\n" + "\n".join([f"- `{c}`" for c in changes]),
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed)
+
 
 class CustomProductSelect(discord.ui.Select):
     def __init__(self, products):
@@ -1496,174 +1659,6 @@ class ClaimDropdown(discord.ui.Select):
         await interaction.response.send_message(
             f"🎁 **Missão Reivindicada!** Você concluiu a missão e recebeu a recompensa: **{rew_label}**."
         )
-
-
-    @app_commands.command(name="olheiro_treino", description="Simula uma sessão de observação do Olheiro em um mini-game de pênalti/finalização!")
-    @lock_user()
-    async def olheiro_treino(self, interaction: discord.Interaction):
-        profile = await get_user_profile(interaction.user)
-        now = time.time()
-        last = profile.get("last_olheiro_treino", 0)
-        is_booster = getattr(interaction.user, "premium_since", None) is not None
-        cooldown = 21600 if is_booster else 43200
-
-        if now - last < cooldown:
-            restante = cooldown - (now - last)
-            horas = int(restante // 3600)
-            minutos = int((restante % 3600) // 60)
-            return await interaction.response.send_message(
-                f"⏳ Aguarde mais **{horas}h {minutos}m** para realizar o treino de observação do Olheiro novamente.",
-                ephemeral=True
-            )
-
-        embed = discord.Embed(
-            title="🎯 Treino de Observação do Olheiro",
-            description=(
-                "Seu olheiro encontrou uma promessa em teste cara a cara com o goleiro!\n\n"
-                " Escolha o canto de finalização abaixo. Se acertar o gol, seu olheiro ganha **+1 Nível**, R$ 25.000 e 2 VLS Coins!"
-            ),
-            color=discord.Color.gold()
-        )
-        view = OlheiroTreinoView(interaction.user.id)
-        await interaction.response.send_message(embed=embed, view=view)
-
-
-    @app_commands.command(name="evento_criar", description="ADM: Inicia um evento de coleção e trava as cartas para caixas/olheiro.")
-    @app_commands.describe(nome_colecao="Nome da coleção a ser travada durante o evento")
-    async def evento_criar(self, interaction: discord.Interaction, nome_colecao: str):
-        from config import ALLOWED_ADMIN_IDS
-        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
-            return await interaction.response.send_message("❌ Apenas administradores podem criar eventos de coleção.", ephemeral=True)
-
-        doc = await db_get("locked_collections")
-        locked = set(doc["data"].get("locked", [])) if doc and "data" in doc else set()
-        locked.add(nome_colecao.strip())
-
-        await db_upsert("locked_collections", {"locked": list(locked), "last_updated": datetime.utcnow().isoformat()})
-        embed = discord.Embed(
-            title="🔒 Evento Iniciado & Coleção Bloqueada!",
-            description=f"A coleção **{nome_colecao}** foi bloqueada com sucesso!\nNenhum jogador conseguirá tirar essas cartas em caixas ou olheiro até o encerramento do torneio.",
-            color=discord.Color.gold()
-        )
-        await interaction.response.send_message(embed=embed)
-
-
-    @app_commands.command(name="evento_encerrar", description="ADM: Encerra o evento de coleção e libera as cartas nas caixas e olheiro.")
-    @app_commands.describe(nome_colecao="Nome da coleção a ser liberada no sistema")
-    async def evento_encerrar(self, interaction: discord.Interaction, nome_colecao: str):
-        from config import ALLOWED_ADMIN_IDS
-        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
-            return await interaction.response.send_message("❌ Apenas administradores podem encerrar eventos.", ephemeral=True)
-
-        doc = await db_get("locked_collections")
-        locked = set(doc["data"].get("locked", [])) if doc and "data" in doc else set()
-        if nome_colecao.strip() in locked:
-            locked.remove(nome_colecao.strip())
-
-        await db_upsert("locked_collections", {"locked": list(locked), "last_updated": datetime.utcnow().isoformat()})
-        embed = discord.Embed(
-            title="🔓 Evento Encerrado & Coleção Liberada!",
-            description=f"A coleção **{nome_colecao}** foi liberada no sistema!\nAgora todos os jogadores podem encontrá-la nas caixas e no olheiro.",
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed)
-
-
-    @app_commands.command(name="sorteio_booster", description="ADM: Realiza o sorteio exclusivo de 2 ganhadores entre os Server Boosters.")
-    async def sorteio_booster(self, interaction: discord.Interaction):
-        from config import ALLOWED_ADMIN_IDS
-        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
-            return await interaction.response.send_message("❌ Apenas administradores podem realizar o sorteio de Boosters.", ephemeral=True)
-
-        guild = interaction.guild
-        if not guild:
-            return await interaction.response.send_message("❌ Comando deve ser executado no servidor.", ephemeral=True)
-
-        boosters = [m for m in guild.members if m.premium_since is not None]
-        if not boosters:
-            return await interaction.response.send_message("❌ Nenhum Server Booster encontrado no servidor no momento.", ephemeral=True)
-
-        ganhadores = random.sample(boosters, min(2, len(boosters)))
-        txt_ganhadores = "\n".join([f"🏆 {m.mention} (`{m.display_name}`)" for m in ganhadores])
-
-        embed = discord.Embed(
-            title="⚡ Sorteio Exclusivo Server Boosters!",
-            description=f"Parabéns aos **2 Ganhadores** do sorteio de Boosters da liga!\n\n{txt_ganhadores}\n\nVocês receberão 1 carta exclusiva da nova coleção!",
-            color=discord.Color.magenta()
-        )
-        await interaction.response.send_message(embed=embed)
-
-
-    @app_commands.command(name="admin_editar_jogador", description="ADM: Edita os atributos, OVR ou posição de um jogador no banco de dados.")
-    @app_commands.describe(
-        id_jogador="ID do jogador no banco (ex: player_lionel_messi_rw)",
-        over="Novo OVR (opcional)",
-        pac="Novo Ritmo / DIV (opcional)",
-        sho="Novo Chute / KIC (opcional)",
-        pas="Novo Passe / HAN (opcional)",
-        dri="Novo Drible / REF (opcional)",
-        def_stat="Nova Defesa / POS (opcional)",
-        phy="Novo Físico / SPD (opcional)",
-        pos="Nova Posição (opcional)"
-    )
-    async def admin_editar_jogador(
-        self,
-        interaction: discord.Interaction,
-        id_jogador: str,
-        over: int = None,
-        pac: int = None,
-        sho: int = None,
-        pas: int = None,
-        dri: int = None,
-        def_stat: int = None,
-        phy: int = None,
-        pos: str = None
-    ):
-        from config import ALLOWED_ADMIN_IDS
-        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
-            return await interaction.response.send_message("❌ Apenas administradores podem editar atributos de jogadores.", ephemeral=True)
-
-        rec = await db_get(f"player_{id_jogador.strip()}")
-        if not rec:
-            return await interaction.response.send_message(f"❌ Carta `{id_jogador}` não foi encontrada no banco Supabase.", ephemeral=True)
-
-        card_data = rec["data"]
-        changes = []
-        if over is not None:
-            card_data["over"] = over
-            changes.append(f"OVR -> {over}")
-        if pac is not None:
-            card_data["pac"] = card_data["div"] = pac
-            changes.append(f"PAC -> {pac}")
-        if sho is not None:
-            card_data["sho"] = card_data["kic"] = sho
-            changes.append(f"SHO -> {sho}")
-        if pas is not None:
-            card_data["pas"] = card_data["han"] = pas
-            changes.append(f"PAS -> {pas}")
-        if dri is not None:
-            card_data["dri"] = card_data["ref"] = dri
-            changes.append(f"DRI -> {dri}")
-        if def_stat is not None:
-            card_data["def"] = card_data["pos_stat"] = def_stat
-            changes.append(f"DEF -> {def_stat}")
-        if phy is not None:
-            card_data["phy"] = card_data["spd"] = phy
-            changes.append(f"PHY -> {phy}")
-        if pos is not None:
-            card_data["pos"] = card_data["original_pos"] = pos.upper()
-            changes.append(f"POS -> {pos.upper()}")
-
-        if not changes:
-            return await interaction.response.send_message("⚠️ Nenhum atributo foi informado para alteração.", ephemeral=True)
-
-        await db_upsert(f"player_{id_jogador.strip()}", card_data)
-        embed = discord.Embed(
-            title="✏️ Carta de Jogador Editada com Sucesso!",
-            description=f"Atleta: **{card_data.get('name')}** (`{id_jogador}`)\n\n**Alterações aplicadas:**\n" + "\n".join([f"- `{c}`" for c in changes]),
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed)
 
 
 class OlheiroTreinoView(discord.ui.View):

@@ -1498,79 +1498,6 @@ class ClaimDropdown(discord.ui.Select):
         )
 
 
-class OlheiroTreinoView(discord.ui.View):
-    def __init__(self, owner_id: int):
-        super().__init__(timeout=60)
-        self.owner_id = owner_id
-
-    @discord.ui.button(label="↖️ Canto Esquerdo Alto", style=discord.ButtonStyle.primary)
-    async def canto_esq(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_shot(interaction, "Canto Esquerdo Alto")
-
-    @discord.ui.button(label="↗️ Canto Direito Alto", style=discord.ButtonStyle.primary)
-    async def canto_dir(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_shot(interaction, "Canto Direito Alto")
-
-    @discord.ui.button(label="⬇️ Centro Rasteiro", style=discord.ButtonStyle.secondary)
-    async def centro(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_shot(interaction, "Centro Rasteiro")
-
-    @discord.ui.button(label="⚽ Cavada / Chip", style=discord.ButtonStyle.success)
-    async def cavada(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self.process_shot(interaction, "Cavada Por Cima")
-
-    async def process_shot(self, interaction: discord.Interaction, escolha: str):
-        if interaction.user.id != self.owner_id:
-            return await interaction.response.send_message("❌ Apenas você pode tentar a finalização.", ephemeral=True)
-
-        for child in self.children:
-            child.disabled = True
-
-        goleiro_defesas = ["Canto Esquerdo Alto", "Canto Direito Alto", "Centro Rasteiro", "Cavada Por Cima"]
-        goleiro_escolha = random.choice(goleiro_defesas)
-
-        if escolha != goleiro_escolha:
-            profile = await get_user_profile(interaction.user)
-            current_lvl = profile.get("scout_level", 1)
-            if current_lvl < SCOUT_LEVEL_MAX:
-                profile["scout_level"] = current_lvl + 1
-                msg_lvl = f"🎯 **GOLAZO!** Seu **Olheiro** subiu para o **Nível {current_lvl + 1}**!"
-            else:
-                msg_lvl = "🎯 **GOLAZO!** Olheiro já no nível máximo!"
-
-            profile["money"] += 25_000
-            profile["premium_coins"] = profile.get("premium_coins", 0) + 2
-            profile["last_olheiro_treino"] = time.time()
-            await save_user_profile(interaction.user.id, profile)
-
-            embed = discord.Embed(
-                title="⚽ GOLAZO DO OBSERVADO!",
-                description=(
-                    f"Você escolheu: **{escolha}**\n"
-                    f"Goleiro pulou em: **{goleiro_escolha}**\n\n"
-                    f"A bola estufou a rede! {msg_lvl}\n"
-                    f"💰 **Recompensa:** R$ 25.000 + 2 VLS Coins!"
-                ),
-                color=discord.Color.green()
-            )
-        else:
-            profile = await get_user_profile(interaction.user)
-            profile["last_olheiro_treino"] = time.time()
-            await save_user_profile(interaction.user.id, profile)
-
-            embed = discord.Embed(
-                title="🧤 DEFESA DO GOLEIRO!",
-                description=(
-                    f"Você escolheu: **{escolha}**\n"
-                    f"Goleiro pulou em: **{goleiro_escolha}**\n\n"
-                    f"O goleiro espalmou! O treino de hoje terminou, mas tente novamente no próximo cooldown."
-                ),
-                color=discord.Color.red()
-            )
-
-        await interaction.response.edit_message(embed=embed, view=self)
-
-
     @app_commands.command(name="olheiro_treino", description="Simula uma sessão de observação do Olheiro em um mini-game de pênalti/finalização!")
     @lock_user()
     async def olheiro_treino(self, interaction: discord.Interaction):
@@ -1737,6 +1664,79 @@ class OlheiroTreinoView(discord.ui.View):
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
+
+
+class OlheiroTreinoView(discord.ui.View):
+    def __init__(self, owner_id: int):
+        super().__init__(timeout=60)
+        self.owner_id = owner_id
+
+    @discord.ui.button(label="↖️ Canto Esquerdo Alto", style=discord.ButtonStyle.primary)
+    async def canto_esq(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_shot(interaction, "Canto Esquerdo Alto")
+
+    @discord.ui.button(label="↗️ Canto Direito Alto", style=discord.ButtonStyle.primary)
+    async def canto_dir(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_shot(interaction, "Canto Direito Alto")
+
+    @discord.ui.button(label="⬇️ Centro Rasteiro", style=discord.ButtonStyle.secondary)
+    async def centro(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_shot(interaction, "Centro Rasteiro")
+
+    @discord.ui.button(label="⚽ Cavada / Chip", style=discord.ButtonStyle.success)
+    async def cavada(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.process_shot(interaction, "Cavada Por Cima")
+
+    async def process_shot(self, interaction: discord.Interaction, escolha: str):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Apenas você pode tentar a finalização.", ephemeral=True)
+
+        for child in self.children:
+            child.disabled = True
+
+        goleiro_defesas = ["Canto Esquerdo Alto", "Canto Direito Alto", "Centro Rasteiro", "Cavada Por Cima"]
+        goleiro_escolha = random.choice(goleiro_defesas)
+
+        if escolha != goleiro_escolha:
+            profile = await get_user_profile(interaction.user)
+            current_lvl = profile.get("scout_level", 1)
+            if current_lvl < SCOUT_LEVEL_MAX:
+                profile["scout_level"] = current_lvl + 1
+                msg_lvl = f"🎯 **GOLAZO!** Seu **Olheiro** subiu para o **Nível {current_lvl + 1}**!"
+            else:
+                msg_lvl = "🎯 **GOLAZO!** Olheiro já no nível máximo!"
+
+            profile["money"] += 25_000
+            profile["premium_coins"] = profile.get("premium_coins", 0) + 2
+            profile["last_olheiro_treino"] = time.time()
+            await save_user_profile(interaction.user.id, profile)
+
+            embed = discord.Embed(
+                title="⚽ GOLAZO DO OBSERVADO!",
+                description=(
+                    f"Você escolheu: **{escolha}**\n"
+                    f"Goleiro pulou em: **{goleiro_escolha}**\n\n"
+                    f"A bola estufou a rede! {msg_lvl}\n"
+                    f"💰 **Recompensa:** R$ 25.000 + 2 VLS Coins!"
+                ),
+                color=discord.Color.green()
+            )
+        else:
+            profile = await get_user_profile(interaction.user)
+            profile["last_olheiro_treino"] = time.time()
+            await save_user_profile(interaction.user.id, profile)
+
+            embed = discord.Embed(
+                title="🧤 DEFESA DO GOLEIRO!",
+                description=(
+                    f"Você escolheu: **{escolha}**\n"
+                    f"Goleiro pulou em: **{goleiro_escolha}**\n\n"
+                    f"O goleiro espalmou! O treino de hoje terminou, mas tente novamente no próximo cooldown."
+                ),
+                color=discord.Color.red()
+            )
+
+        await interaction.response.edit_message(embed=embed, view=self)
 
 
 async def setup(bot):

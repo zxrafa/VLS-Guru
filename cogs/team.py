@@ -138,6 +138,27 @@ class TeamCog(commands.Cog, name="Equipe"):
         except Exception:
             return []
 
+    @app_commands.command(name="mentalidade", description="Define a postura e mentalidade tática do seu time (Defensiva, Equilibrada ou Ofensiva).")
+    @app_commands.describe(opcao="Escolha a postura tática da equipe")
+    @app_commands.choices(opcao=[
+        app_commands.Choice(name="Equilibrada (Neutro / Padrão)", value="equilibrada"),
+        app_commands.Choice(name="Defensiva (+35% Defesa, -25% Ataque)", value="defensiva"),
+        app_commands.Choice(name="Ofensiva (+25% Ataque, +15% Passe, maior risco de contra-ataque)", value="ofensiva"),
+    ])
+    async def mentalidade(self, interaction: discord.Interaction, opcao: str):
+        profile = await get_user_profile(interaction.user)
+        profile["mentality"] = opcao
+        await save_user_profile(interaction.user.id, profile)
+
+        from config import MENTALITIES
+        m_info = MENTALITIES.get(opcao, MENTALITIES["equilibrada"])
+        embed = discord.Embed(
+            title=f"🧠 Mentalidade Alterada — {m_info['name']}",
+            description=f"**Descrição:** {m_info['desc']}\n\n**Efeito:** Postura **{opcao.capitalize()}** aplicada com sucesso ao seu time!",
+            color=discord.Color.blue()
+        )
+        await interaction.response.send_message(embed=embed)
+
     @app_commands.command(name="time", description="Exibe a prancheta tática visual do seu clube.")
     async def time(self, interaction: discord.Interaction):
         await interaction.response.defer()

@@ -855,7 +855,7 @@ class EconomyCog(commands.Cog, name="Economia"):
         )
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="sorteio_booster", description="ADM: Realiza o sorteio exclusivo de 2 ganhadores entre os Server Boosters.")
+    @app_commands.command(name="sorteio_booster", description="ADM: Realiza o sorteio exclusivo e entrega recompensas aos 2 ganhadores entre os Server Boosters.")
     async def sorteio_booster(self, interaction: discord.Interaction):
         from config import ALLOWED_ADMIN_IDS
         if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
@@ -869,15 +869,43 @@ class EconomyCog(commands.Cog, name="Economia"):
         if not boosters:
             return await interaction.response.send_message("❌ Nenhum Server Booster encontrado no servidor no momento.", ephemeral=True)
 
+        await interaction.response.defer()
+
         ganhadores = random.sample(boosters, min(2, len(boosters)))
-        txt_ganhadores = "\n".join([f"🏆 {m.mention} (`{m.display_name}`)" for m in ganhadores])
+        all_db_players = await get_all_players()
+
+        txt_ganhadores = []
+        for winner in ganhadores:
+            winner_profile = await get_user_profile(winner)
+            winner_profile["money"] += 200_000
+            winner_profile["premium_coins"] = winner_profile.get("premium_coins", 0) + 50
+
+            carta_concedida = "Nenhuma carta cadastrada"
+            if all_db_players:
+                candidatas = [p for p in all_db_players if p.get("over", 0) >= 80]
+                if not candidatas:
+                    candidatas = all_db_players
+                chosen_card = random.choice(candidatas)
+                
+                instanced = chosen_card.copy()
+                instanced["instance_id"] = str(uuid.uuid4())[:8]
+                instanced["original_pos"] = chosen_card.get("pos", "ST")
+                instanced["acquired_at"] = datetime.utcnow().isoformat()
+                instanced.update({"goals": 0, "assists": 0, "saves": 0, "matches": 0, "mvps": 0, "yellow_cards": 0, "red_cards": 0, "xp": 0})
+                
+                winner_profile.setdefault("inventory", []).append(instanced)
+                carta_concedida = f"{chosen_card.get('col_emoji','✨')} **{chosen_card['name']}** (OVR {chosen_card['over']})"
+
+            await save_user_profile(winner.id, winner_profile)
+            txt_ganhadores.append(f"🏆 {winner.mention} (`{winner.display_name}`)\n  └ 🎁 Recompensa: **R$ 200.000** + **50 VLS Coins** + Carta {carta_concedida}")
 
         embed = discord.Embed(
             title="⚡ Sorteio Exclusivo Server Boosters!",
-            description=f"Parabéns aos **2 Ganhadores** do sorteio de Boosters da liga!\n\n{txt_ganhadores}\n\nVocês receberão 1 carta exclusiva da nova coleção!",
+            description="Parabéns aos **2 Ganhadores** do sorteio de Boosters da liga!\nAs recompensas foram creditadas diretamente no inventário e conta dos vencedores:\n\n" + "\n\n".join(txt_ganhadores),
             color=discord.Color.magenta()
         )
-        await interaction.response.send_message(embed=embed)
+        embed.set_footer(text="VLS League • Recompensa Exclusiva de Apoio ao Servidor")
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="admin_editar_jogador", description="ADM: Edita os atributos, OVR ou posição de um jogador no banco de dados.")
     @app_commands.describe(

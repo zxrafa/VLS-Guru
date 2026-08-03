@@ -381,6 +381,8 @@ def run_match_simulation(
     p2_formation: str = "4-3-3",
     p1_torcida_level: int = 1,
     p2_torcida_level: int = 1,
+    p1_mentality: str = "equilibrada",
+    p2_mentality: str = "equilibrada",
 ) -> dict:
     """
     Executa a simulação completa de uma partida de 90 minutos.
@@ -519,27 +521,29 @@ def run_match_simulation(
         p2_active = [p for p in p2_xi if p["instance_id"] not in sent_off]
 
         p1_force = sum(
-            sum(get_player_effective_stats(p, p1_chem.get(p["instance_id"], 0), p1_tactic, p1_stamina[p["instance_id"]], p1_crowd, p1_torcida_level).values())
+            sum(get_player_effective_stats(p, p1_chem.get(p["instance_id"], 0), p1_tactic, p1_stamina[p["instance_id"]], p1_crowd, p1_torcida_level, p1_mentality).values())
             for p in p1_active
         ) or 1
         p2_force = sum(
-            sum(get_player_effective_stats(p, p2_chem.get(p["instance_id"], 0), p2_tactic, p2_stamina[p["instance_id"]], p2_crowd, p2_torcida_level).values())
+            sum(get_player_effective_stats(p, p2_chem.get(p["instance_id"], 0), p2_tactic, p2_stamina[p["instance_id"]], p2_crowd, p2_torcida_level, p2_mentality).values())
             for p in p2_active
         ) or 1
 
         prob_p1_attacks = p1_force / (p1_force + p2_force)
         is_p1_attack = random.random() < prob_p1_attacks
 
-        atk_xi      = p1_xi      if is_p1_attack else p2_xi
-        def_xi      = p2_xi      if is_p1_attack else p1_xi
-        atk_stamina = p1_stamina if is_p1_attack else p2_stamina
-        def_stamina = p2_stamina if is_p1_attack else p1_stamina
-        atk_chem    = p1_chem    if is_p1_attack else p2_chem
-        def_chem    = p2_chem    if is_p1_attack else p1_chem
-        atk_tactic  = p1_tactic  if is_p1_attack else p2_tactic
-        def_tactic  = p2_tactic  if is_p1_attack else p1_tactic
-        atk_key     = "p1"       if is_p1_attack else "p2"
-        def_key     = "p2"       if is_p1_attack else "p1"
+        atk_xi        = p1_xi        if is_p1_attack else p2_xi
+        def_xi        = p2_xi        if is_p1_attack else p1_xi
+        atk_stamina   = p1_stamina   if is_p1_attack else p2_stamina
+        def_stamina   = p2_stamina   if is_p1_attack else p1_stamina
+        atk_chem      = p1_chem      if is_p1_attack else p2_chem
+        def_chem      = p2_chem      if is_p1_attack else p1_chem
+        atk_tactic    = p1_tactic    if is_p1_attack else p2_tactic
+        def_tactic    = p2_tactic    if is_p1_attack else p1_tactic
+        atk_mentality = p1_mentality if is_p1_attack else p2_mentality
+        def_mentality = p2_mentality if is_p1_attack else p1_mentality
+        atk_key       = "p1"         if is_p1_attack else "p2"
+        def_key       = "p2"         if is_p1_attack else "p1"
 
         gk_list  = active_from(def_xi, ["PO"])
         def_list = active_from(def_xi, ["DFC", "MID"])
@@ -570,9 +574,9 @@ def run_match_simulation(
                 elif p2_crowd == "humor":
                     narration_log.append(f"⏱️ **{minute:02d}'** — 📣 A torcida visitante aplaude de pé o futebol bonito do {p2_name}!")
 
-        atk_eff = get_player_effective_stats(atacante, atk_chem.get(atacante["instance_id"], 0), atk_tactic, atk_stamina[atacante["instance_id"]], p1_crowd if is_p1_attack else p2_crowd, p1_torcida_level if is_p1_attack else p2_torcida_level)
-        def_eff = get_player_effective_stats(defensor, def_chem.get(defensor["instance_id"], 0), def_tactic, def_stamina[defensor["instance_id"]], p2_crowd if is_p1_attack else p1_crowd, p2_torcida_level if is_p1_attack else p1_torcida_level)
-        gk_eff  = get_player_effective_stats(gk,       def_chem.get(gk["instance_id"], 0),       def_tactic, def_stamina[gk["instance_id"]], p2_crowd if is_p1_attack else p1_crowd, p2_torcida_level if is_p1_attack else p1_torcida_level)
+        atk_eff = get_player_effective_stats(atacante, atk_chem.get(atacante["instance_id"], 0), atk_tactic, atk_stamina[atacante["instance_id"]], p1_crowd if is_p1_attack else p2_crowd, p1_torcida_level if is_p1_attack else p2_torcida_level, atk_mentality)
+        def_eff = get_player_effective_stats(defensor, def_chem.get(defensor["instance_id"], 0), def_tactic, def_stamina[defensor["instance_id"]], p2_crowd if is_p1_attack else p1_crowd, p2_torcida_level if is_p1_attack else p1_torcida_level, def_mentality)
+        gk_eff  = get_player_effective_stats(gk,       def_chem.get(gk["instance_id"], 0),       def_tactic, def_stamina[gk["instance_id"]], p2_crowd if is_p1_attack else p1_crowd, p2_torcida_level if is_p1_attack else p1_torcida_level, def_mentality)
 
         if random.random() < 0.12:
             stats[def_key]["fouls"] += 1

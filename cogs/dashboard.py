@@ -756,12 +756,110 @@ class EditPlaystyleSelect(discord.ui.Select):
         )
 
 
+class EditarAtributosModal(discord.ui.Modal, title="✏️ Editar Stats do Atleta"):
+    def __init__(self, view_ref):
+        super().__init__()
+        self.view_ref = view_ref
+        data = view_ref.player_data
+        is_gk = data.get("pos") == "GK"
+
+        lbl_pac = "Diving (DIV)" if is_gk else "Ritmo (PAC)"
+        lbl_sho = "Kicking (KIC)" if is_gk else "Chute (SHO)"
+        lbl_pas = "Handling (HAN)" if is_gk else "Passe (PAS)"
+        lbl_dri = "Reflexes (REF)" if is_gk else "Drible (DRI)"
+        lbl_def = "Positioning (POS)" if is_gk else "Defesa (DEF)"
+
+        self.pac_input = discord.ui.TextInput(
+            label=lbl_pac,
+            default=str(data.get("div" if is_gk else "pac", data.get("over", 75))),
+            required=False,
+            max_length=3
+        )
+        self.sho_input = discord.ui.TextInput(
+            label=lbl_sho,
+            default=str(data.get("kic" if is_gk else "sho", data.get("over", 75))),
+            required=False,
+            max_length=3
+        )
+        self.pas_input = discord.ui.TextInput(
+            label=lbl_pas,
+            default=str(data.get("han" if is_gk else "pas", data.get("over", 75))),
+            required=False,
+            max_length=3
+        )
+        self.dri_input = discord.ui.TextInput(
+            label=lbl_dri,
+            default=str(data.get("ref" if is_gk else "dri", data.get("over", 75))),
+            required=False,
+            max_length=3
+        )
+        self.def_input = discord.ui.TextInput(
+            label=lbl_def,
+            default=str(data.get("pos_stat" if is_gk else "def", data.get("over", 75))),
+            required=False,
+            max_length=3
+        )
+
+        self.add_item(self.pac_input)
+        self.add_item(self.sho_input)
+        self.add_item(self.pas_input)
+        self.add_item(self.dri_input)
+        self.add_item(self.def_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        data = self.view_ref.player_data
+        is_gk = data.get("pos") == "GK"
+
+        try:
+            val_pac = int(self.pac_input.value)
+            if is_gk: data["div"] = val_pac
+            else: data["pac"] = val_pac
+        except ValueError: pass
+
+        try:
+            val_sho = int(self.sho_input.value)
+            if is_gk: data["kic"] = val_sho
+            else: data["sho"] = val_sho
+        except ValueError: pass
+
+        try:
+            val_pas = int(self.pas_input.value)
+            if is_gk: data["han"] = val_pas
+            else: data["pas"] = val_pas
+        except ValueError: pass
+
+        try:
+            val_dri = int(self.dri_input.value)
+            if is_gk: data["ref"] = val_dri
+            else: data["dri"] = val_dri
+        except ValueError: pass
+
+        try:
+            val_def = int(self.def_input.value)
+            if is_gk: data["pos_stat"] = val_def
+            else: data["def"] = val_def
+        except ValueError: pass
+
+        await interaction.response.send_message(
+            f"✅ **Atributos do atleta atualizados com sucesso!**\nLembre-se de clicar em **💾 Salvar e Concluir** para registrar permanentemente no Supabase.",
+            ephemeral=True
+        )
+
+
 class EditarJogadorOpcoesView(discord.ui.View):
     def __init__(self, owner_id: int, doc_id: str, player_data: dict):
         super().__init__(timeout=300)
         self.owner_id = owner_id
         self.doc_id = doc_id
         self.player_data = player_data
+
+    @discord.ui.button(label="📊 Editar Stats", style=discord.ButtonStyle.secondary, row=1)
+    async def editar_atributos(self, interaction: discord.Interaction, button: discord.ui.Button):
+        if interaction.user.id != self.owner_id:
+            return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
+            
+        modal = EditarAtributosModal(self)
+        await interaction.response.send_modal(modal)
 
     @discord.ui.button(label="🎭 Mudar PlayStyles", style=discord.ButtonStyle.primary, row=1)
     async def mudar_playstyles(self, interaction: discord.Interaction, button: discord.ui.Button):

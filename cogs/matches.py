@@ -1309,7 +1309,8 @@ class MatchesCog(commands.Cog, name="Partidas"):
             )
             color = discord.Color.blue()
 
-        narracao = "\n".join(sim_res["events"][:6])
+        events_list = sim_res.get("events") or sim_res.get("narration") or []
+        narracao = "\n".join(events_list[:6]) if events_list else "Partida encerrada sem destaques."
         embed = discord.Embed(
             title=f"👑 Modo Desafio Histórico — {cpu_name}",
             description=f"**Placar Final:** {profile.get('club_name', 'Seu Time')} **{gols_user} x {gols_cpu}** {cpu_name}\n\n{res_msg}\n\n**Principais Momentos:**\n{narracao}",

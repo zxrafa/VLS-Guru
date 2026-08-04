@@ -978,6 +978,7 @@ def run_match_simulation(
         "stats":      stats,
         "xg":         xg_data,
         "narration":  narration_log,
+        "events":     narration_log,
         "performance": performance,
         "mvp":        mvp_name,
         "p1_xi":      p1_xi,

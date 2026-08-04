@@ -1290,34 +1290,19 @@ class MatchesCog(commands.Cog, name="Partidas"):
             profile["premium_coins"] = profile.get("premium_coins", 0) + coins_earned
             profile["desafios_historicos_wins"] = profile.get("desafios_historicos_wins", 0) + 1
             await save_user_profile(interaction.user.id, profile)
-
-            res_msg = (
-                f"🎉 **VITÓRIA HISTÓRICA!** Você venceu o lendário **{cpu_name}** por **{gols_user} x {gols_cpu}**!\n\n"
-                f"💰 **Premiação:** R$ {money_earned:,} + 💎 10 VLS Coins!"
-            )
-            color = discord.Color.gold()
+            footer_msg = f"🎉 **VITÓRIA HISTÓRICA!** Você venceu o **{cpu_name}** por {gols_user}x{gols_cpu} e faturou **R$ 50.000** + 💎 **10 VLS Coins**!"
         elif gols_user < gols_cpu:
-            res_msg = (
-                f"💔 **DERROTA!** O lendário **{cpu_name}** venceu a partida por **{gols_cpu} x {gols_user}**.\n\n"
-                f"Ajuste sua tática ou escalação e tente novamente!"
-            )
-            color = discord.Color.red()
+            footer_msg = f"💔 **DERROTA HISTÓRICA!** O **{cpu_name}** venceu a partida por {gols_cpu}x{gols_user}. Ajuste sua tática para o próximo confronto!"
         else:
-            res_msg = (
-                f"🤝 **EMPATE TÁTICO!** O confronto terminou empatado em **{gols_user} x {gols_cpu}** contra o **{cpu_name}**.\n\n"
-                f"Nenhum vencedor nesta rodada!"
-            )
-            color = discord.Color.blue()
+            footer_msg = f"🤝 **EMPATE TÁTICO!** O confronto contra o **{cpu_name}** terminou em {gols_user}x{gols_cpu}."
 
-        events_list = sim_res.get("events") or sim_res.get("narration") or []
-        narracao = "\n".join(events_list[:6]) if events_list else "Partida encerrada sem destaques."
-        embed = discord.Embed(
-            title=f"👑 Modo Desafio Histórico — {cpu_name}",
-            description=f"**Placar Final:** {profile.get('club_name', 'Seu Time')} **{gols_user} x {gols_cpu}** {cpu_name}\n\n{res_msg}\n\n**Principais Momentos:**\n{narracao}",
-            color=color
+        await self.show_simulation_pages(
+            interaction=interaction,
+            p1_name=profile.get("club_name", "Meu Clube"),
+            p2_name=cpu_name,
+            sim_res=sim_res,
+            footer_msg=footer_msg
         )
-        embed.set_footer(text="VLS Historical Challenge • Modo de Desafios Clássicos")
-        await interaction.followup.send(embed=embed)
 
     # ── MÓDULO 6: MODO LIGA ────────────────────────────────────────────────────
     

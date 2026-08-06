@@ -313,9 +313,6 @@ class ChatCog(commands.Cog, name="Chat"):
         if not content:
             content = "oi"
 
-        # URL do endpoint do Gemini
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
-        
         # Carrega as memórias do Supabase (Permanentes e Média Duração)
         perm_memories = await load_permanent_memories()
         perm_context = format_permanent_memory_prompt(perm_memories)
@@ -374,6 +371,15 @@ class ChatCog(commands.Cog, name="Chat"):
             f"{memory_context}"
         )
 
+        models_to_try = [
+            os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            "gemini-2.0-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash-lite"
+        ]
+        models_to_try = list(dict.fromkeys(models_to_try))
+
         payload = {
             "contents": [
                 {"parts": [{"text": content}]}
@@ -387,39 +393,44 @@ class ChatCog(commands.Cog, name="Chat"):
             }
         }
 
-        for attempt in range(3):
-            try:
-                async with self.session.post(url, json=payload, timeout=12) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            if parts:
-                                reply_text = parts[0].get("text", "").strip()
-                                
-                                if reply_text == "[IGNORE]" or "[IGNORE]" in reply_text:
+        for model_name in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
+            for attempt in range(2):
+                try:
+                    async with self.session.post(url, json=payload, timeout=12) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            candidates = data.get("candidates", [])
+                            if candidates:
+                                parts = candidates[0].get("content", {}).get("parts", [])
+                                if parts:
+                                    reply_text = parts[0].get("text", "").strip()
+                                    
+                                    if reply_text == "[IGNORE]" or "[IGNORE]" in reply_text:
+                                        return
+
+                                    keywords = ["bug", "erro", "sugestao", "sugestão", "reclamacao", "reclamação", "ideia", "melhorar", "mudar", "consertar", "ajuda", "painel", "site"]
+                                    is_feedback = any(k in lower_content for k in keywords)
+
+                                    if is_feedback:
+                                        await self.save_feedback(message.author, content)
+
+                                    await message.reply(reply_text)
+                                    await save_chat_memory(message.channel.id, message.author, content, reply_text)
                                     return
-
-                                keywords = ["bug", "erro", "sugestao", "sugestão", "reclamacao", "reclamação", "ideia", "melhorar", "mudar", "consertar", "ajuda", "painel", "site"]
-                                is_feedback = any(k in lower_content for k in keywords)
-
-                                if is_feedback:
-                                    await self.save_feedback(message.author, content)
-
-                                await message.reply(reply_text)
-                                await save_chat_memory(message.channel.id, message.author, content, reply_text)
-                                return
-                    elif resp.status == 429:
-                        print(f"[Chat AI] Rate limit 429. Aguardando 2.5s antes da tentativa {attempt+2}/3...")
-                        await asyncio.sleep(2.5)
-                    else:
-                        err_txt = await resp.text()
-                        print(f"Erro Gemini API (Status {resp.status}): {err_txt}")
-                        break
-            except Exception as e:
-                print(f"Exceção ao chamar API do Gemini (tentativa {attempt+1}): {e}")
-                await asyncio.sleep(1.5)
+                        elif resp.status == 429:
+                            print(f"[Chat AI] Rate limit 429 no modelo {model_name}. Aguardando 2.5s...")
+                            await asyncio.sleep(2.5)
+                        elif resp.status == 404:
+                            print(f"[Chat AI] Modelo {model_name} retornou 404, tentando próximo modelo...")
+                            break
+                        else:
+                            err_txt = await resp.text()
+                            print(f"Erro Gemini API (Status {resp.status} - {model_name}): {err_txt}")
+                            break
+                except Exception as e:
+                    print(f"Exceção ao chamar API do Gemini ({model_name}): {e}")
+                    await asyncio.sleep(1.5)
 
     async def handle_admin_nlp(self, message: discord.Message):
         # Remove menções ao bot do conteúdo para a IA focar no comando

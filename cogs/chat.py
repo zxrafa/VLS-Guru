@@ -300,8 +300,21 @@ class ChatCog(commands.Cog, name="Chat"):
             print("[Chat] Erro: GEMINI_API_KEY não configurada no ambiente/env.")
             return
 
-        # URL do endpoint do Gemini (Lite)
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key={gemini_api_key}"
+        # Verifica se o usuário pediu modo de resposta normal/detalhada
+        is_normal_mode = False
+        normal_flags = ["--resposta-normal", "--normal", "--detalhado", "--completo"]
+        for flag in normal_flags:
+            if flag in content:
+                is_normal_mode = True
+                content = content.replace(flag, "").strip()
+
+        # Clean prompt content
+        content = " ".join(content.split())
+        if not content:
+            content = "oi"
+
+        # URL do endpoint do Gemini
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_api_key}"
         
         # Carrega as memórias do Supabase (Permanentes e Média Duração)
         perm_memories = await load_permanent_memories()
@@ -309,16 +322,53 @@ class ChatCog(commands.Cog, name="Chat"):
         
         history = await load_chat_memory(message.channel.id, max_items=15)
         memory_context = format_memory_prompt(history)
-
         time_context = get_time_context_str()
+
+        knowledge_base = (
+            "MANUAL E CONHECIMENTO COMPLETO DO BOT VLS GURU:\n"
+            "Você é a IA oficial do VLS Guru, um bot de futebol de cartas, economia e simulação no Discord.\n\n"
+            "COMO FUNCIONA O BOT & DICAS DE EVOLUÇÃO:\n"
+            "1. Economia & Moedas: R$ (Dinheiro) e VLS Coins 💎. Ganhe com caixas, partidas, olheiro, roleta e missões.\n"
+            "2. Formações & Táticas: 12 formações disponíveis (/time, /escalar, /tatico, /mentalidade). "
+            "Táticas: Padrão, Gegenpress (+defesa/físico, mais estamina), Tiki-Taka (+passe/drible), Catenaccio (+defesa, -chute), Futebol Total (+20% geral), Park The Bus (+50% defesa).\n"
+            "Mentalidade (/mentalidade): Defensiva (+35% defesa, -25% ataque), Equilibrada (1.0x), Ofensiva (+25% ataque, +15% passe).\n"
+            "3. Cartas, Stats & PlayStyles: Atributos de linha (PAC, SHO, PAS, DRI, DEF, PHY) e Goleiro (DIV, KIC, HAN, REF, POS, SPD). "
+            "19 PlayStyles no total (15 de linha + 4 de goleiro: Arremesso Especial, Encaixada, Soco, Espalmada). "
+            "Titulares ganham +1 XP de afinidade por partida (cada 10 XP = +0.5% bônus, teto +5%).\n"
+            "4. Modos de Jogo: /treino (R$ 3.000 + +1 XP pra todos os titulares), /desafio (PvP), /x1_aposta (PvP com aposta), /penalti_desafio, "
+            "/liga (Modo Carreira com 7 divisões contra cartas reais), /modo_desafio (Enfrente 9 Times Históricos valendo R$ 50.000 + 10 Coins).\n"
+            "5. Olheiro & Treino (/olheiro_treino): Pênalti contra olheiro. Gol = +1 Nível de Olheiro grátis + R$ 25.000 + 2 VLS Coins!\n"
+            "6. Estádio & Torcida (/upar_torcida): Torcida reduz penalidade de vaias e aumenta bônus de empolgação nos jogos.\n"
+            "7. Dicas de Evolução Rápida: Faça /treino todo dia; faça o /olheiro_treino sempre no cooldown; jogue a /liga para subir de divisão; "
+            "enfrente os times históricos no /modo_desafio; venda repetidas no /multisell ou /mercado."
+        )
+
+        if is_normal_mode:
+            mode_instruction = (
+                "O usuário solicitou explicitamente uma RESPOSTA NORMAL E DETALHADA (usando a flag `--resposta-normal`).\n"
+                "INSTRUÇÕES OBRIGATÓRIAS PARA ESTE MODO:\n"
+                "- Responda de forma completa, didática, bem explicada, clara e sem enrolação.\n"
+                "- Se o usuário pedir dicas de como evoluir, como fazer algo, como funciona um comando ou sistema, ENSINE TUDO passo a passo com total clareza.\n"
+                "- Use formatação limpa do Discord (títulos, negrito, tópicos, emojis) para ficar muito agradável e fácil de ler.\n"
+                "- Forneça detalhes completos sobre os sistemas do bot (treinos, olheiro, táticas, mentalidade, liga, desafios) conforme o contexto."
+            )
+            max_tokens = 1000
+        else:
+            mode_instruction = (
+                "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
+                "use linguagem super humana da internet: tudo minúsculo, pouquíssimas ou nenhuma vírgula, "
+                "abreviações (pq, tbm, vlw, blz, nd, gnt, etc.). responda no máximo com 1 ou 2 frases curtas. "
+                "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
+                "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
+                "dica: lembre o usuário de que se ele quiser uma explicação longa/tutorial completo, ele pode colocar `--resposta-normal` no final do texto."
+            )
+            max_tokens = 120
+
         system_instruction = (
-            "você é o bot vls guru. responda sempre de forma extremamente direta, curta e informal. "
-            "use linguagem super humana da internet: tudo minúsculo, pouquíssimas ou nenhuma vírgula, "
-            "abreviações (pq, tbm, vlw, blz, nd, gnt, etc.). responda no máximo com 1 ou 2 frases curtas. "
-            "se a mensagem for apenas risadas sem nexo ou spams de letras repetidas sem nexo, responda apenas com a palavra [IGNORE]. "
-            "se for uma saudação curta comum (oi, ola, eae, salve, etc), responda normalmente de forma simpática e informal. "
-            "se perguntarem as horas, o dia, a data ou qual o momento atual, use as informações do contexto temporal fornecidas abaixo de forma bem informal. "
-            "você possui memória permanente (fatos fixados por administradores) e memória de média duração salvas no Supabase. use essas informações para responder com total precisão sobre regras, fatos fixados, o que foi conversado antes e preferências.\n\n"
+            f"{mode_instruction}\n\n"
+            f"{knowledge_base}\n\n"
+            f"se perguntarem as horas, o dia, a data ou qual o momento atual, use as informações do contexto temporal fornecidas abaixo.\n"
+            f"você possui memória permanente (fatos fixados por administradores) e memória de média duração salvas no Supabase.\n\n"
             f"{time_context}\n\n"
             f"{perm_context}\n\n"
             f"{memory_context}"
@@ -332,39 +382,44 @@ class ChatCog(commands.Cog, name="Chat"):
                 "parts": [{"text": system_instruction}]
             },
             "generationConfig": {
-                "maxOutputTokens": 100,
+                "maxOutputTokens": max_tokens,
                 "temperature": 0.7
             }
         }
 
-        try:
-            async with self.session.post(url, json=payload, timeout=10) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        parts = candidates[0].get("content", {}).get("parts", [])
-                        if parts:
-                            reply_text = parts[0].get("text", "").strip()
-                            
-                            # Se a IA julgar que a mensagem deve ser ignorada
-                            if reply_text == "[IGNORE]" or "[IGNORE]" in reply_text:
+        for attempt in range(3):
+            try:
+                async with self.session.post(url, json=payload, timeout=12) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            parts = candidates[0].get("content", {}).get("parts", [])
+                            if parts:
+                                reply_text = parts[0].get("text", "").strip()
+                                
+                                if reply_text == "[IGNORE]" or "[IGNORE]" in reply_text:
+                                    return
+
+                                keywords = ["bug", "erro", "sugestao", "sugestão", "reclamacao", "reclamação", "ideia", "melhorar", "mudar", "consertar", "ajuda", "painel", "site"]
+                                is_feedback = any(k in lower_content for k in keywords)
+
+                                if is_feedback:
+                                    await self.save_feedback(message.author, content)
+
+                                await message.reply(reply_text)
+                                await save_chat_memory(message.channel.id, message.author, content, reply_text)
                                 return
-
-                            # Identifica se a mensagem tem comportamento de sugestão/bug/reclamação
-                            keywords = ["bug", "erro", "sugestao", "sugestão", "reclamacao", "reclamação", "ideia", "melhorar", "mudar", "consertar", "ajuda", "painel", "site"]
-                            is_feedback = any(k in lower_content for k in keywords)
-
-                            if is_feedback:
-                                await self.save_feedback(message.author, content)
-
-                            await message.reply(reply_text)
-                            await save_chat_memory(message.channel.id, message.author, content, reply_text)
-                else:
-                    err_txt = await resp.text()
-                    print(f"Erro Gemini API (Status {resp.status}): {err_txt}")
-        except Exception as e:
-            print(f"Erro ao chamar API do Gemini: {e}")
+                    elif resp.status == 429:
+                        print(f"[Chat AI] Rate limit 429. Aguardando 2.5s antes da tentativa {attempt+2}/3...")
+                        await asyncio.sleep(2.5)
+                    else:
+                        err_txt = await resp.text()
+                        print(f"Erro Gemini API (Status {resp.status}): {err_txt}")
+                        break
+            except Exception as e:
+                print(f"Exceção ao chamar API do Gemini (tentativa {attempt+1}): {e}")
+                await asyncio.sleep(1.5)
 
     async def handle_admin_nlp(self, message: discord.Message):
         # Remove menções ao bot do conteúdo para a IA focar no comando

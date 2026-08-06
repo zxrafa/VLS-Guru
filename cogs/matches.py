@@ -258,15 +258,44 @@ class MatchesCog(commands.Cog, name="Partidas"):
         p2_ovr = sum(p.get("over", 0) for p in p2_xi) // len(p2_xi) if p2_xi else 0
 
         try:
-            # Revela titulares por escrito, 1 por 1, mostrando: Coleção, Rated, Posição e Nome de cada lado
-            p1_by_pos = {p.get("pos"): p for p in p1_xi if p.get("pos")}
-            p2_by_pos = {p.get("pos"): p for p in p2_xi if p.get("pos")}
-            
             from formations_coordinates import FORMATIONS
             slots = list(FORMATIONS.get(p1_form, FORMATIONS["4-3-3"]).keys())
             
-            reveal_msg = await interaction.followup.send("📋 **Escalações Oficiais — Preparando a revelação dos times...**")
-            
+            def map_players_to_slots(xi: list, slots: list) -> dict:
+                assigned = {}
+                remaining = list(xi)
+
+                # 1. Match exato de slot / pos
+                for slot in slots:
+                    for p in remaining:
+                        p_pos = (p.get("pos") or "").upper()
+                        p_slot = (p.get("slot") or "").upper()
+                        if p_slot == slot.upper() or p_pos == slot.upper():
+                            assigned[slot] = p
+                            remaining.remove(p)
+                            break
+
+                # 2. Match por grupo de posição base (ex: CB1/CB2 -> CB, CM1/CM2 -> CM, ST1/ST2 -> ST)
+                for slot in slots:
+                    if slot not in assigned:
+                        base_pos = ''.join([c for c in slot if not c.isdigit()]).upper()
+                        for p in remaining:
+                            p_pos = (p.get("pos") or "").upper()
+                            if p_pos == base_pos:
+                                assigned[slot] = p
+                                remaining.remove(p)
+                                break
+
+                # 3. Preenche posições restantes por ordem dos jogadores disponíveis
+                for slot in slots:
+                    if slot not in assigned and remaining:
+                        assigned[slot] = remaining.pop(0)
+
+                return assigned
+
+            p1_mapped = map_players_to_slots(p1_xi, slots)
+            p2_mapped = map_players_to_slots(p2_xi, slots)
+
             def format_revealed_player(p: dict) -> str:
                 if not p:
                     return "*[Vazio]*"
@@ -277,38 +306,28 @@ class MatchesCog(commands.Cog, name="Partidas"):
                 return f"{col_emoji} **{over}** {pos} - *{name}*"
 
             revealed_lines = []
-            for i, slot in enumerate(slots):
-                p1_p = p1_by_pos.get(slot)
-                p2_p = p2_by_pos.get(slot)
+            for slot in slots:
+                p1_p = p1_mapped.get(slot)
+                p2_p = p2_mapped.get(slot)
                 
                 p1_str = format_revealed_player(p1_p)
                 p2_str = format_revealed_player(p2_p)
                 
                 line = f"`[{slot}]` {p1_str} 🆚 {p2_str}"
                 revealed_lines.append(line)
-                
-                embed_reveal = discord.Embed(
-                    title=f"📋 Escalações Oficiais — {p1_name} x {p2_name}",
-                    description=f"**Esquemas:** {p1_form} 🆚 {p2_form}\n\n" + "\n".join(revealed_lines),
-                    color=discord.Color.blue()
-                )
-                embed_reveal.set_footer(text=f"Transmissão ao vivo • Revelando titulares... ({i+1}/11)")
-                await reveal_msg.edit(content="", embed=embed_reveal)
-                await asyncio.sleep(1.0)
-                
-            # Altera rodapé ao finalizar
+
             embed_reveal = discord.Embed(
                 title=f"📋 Escalações Oficiais — {p1_name} x {p2_name}",
                 description=f"**Esquemas:** {p1_form} 🆚 {p2_form}\n\n" + "\n".join(revealed_lines),
                 color=discord.Color.blue()
             )
             embed_reveal.set_footer(text="Titulares revelados! Fim da preleção, bola vai rolar!")
-            await reveal_msg.edit(embed=embed_reveal)
+            await interaction.followup.send(embed=embed_reveal)
         except Exception as e:
-            print(f"Erro ao exibir revelação das escalações por escrito: {e}")
+            print(f"Erro ao exibir escalações: {e}")
             
         msg = await interaction.followup.send(embed=embed_pre)
-        await asyncio.sleep(6.0)
+        await asyncio.sleep(2.0)
 
         # --- SIMULAÇÃO TRANSMISSÃO AO VIVO ---
         current_p1_goals = 0
@@ -356,7 +375,7 @@ class MatchesCog(commands.Cog, name="Partidas"):
                 )
                 embed_interval.set_footer(text="VLS TV • Ao Vivo")
                 await msg.edit(embed=embed_interval)
-                await asyncio.sleep(5.0)
+                await asyncio.sleep(2.0)
 
             # Adiciona o lance na lista de recentes
             recent_plays.append(play)
@@ -387,7 +406,7 @@ class MatchesCog(commands.Cog, name="Partidas"):
                 embed_live.color = discord.Color.brand_green()
 
             await msg.edit(embed=embed_live)
-            await asyncio.sleep(3.5)
+            await asyncio.sleep(1.2)
 
         # --- APITO FINAL LIVE ---
         embed_apito = discord.Embed(
@@ -400,7 +419,7 @@ class MatchesCog(commands.Cog, name="Partidas"):
         )
         embed_apito.set_footer(text="VLS TV • Ao Vivo")
         await msg.edit(embed=embed_apito)
-        await asyncio.sleep(4.0)
+        await asyncio.sleep(1.5)
 
         # --- PREPARA RELATÓRIO FINAL COM BOTOES E PAGINAÇÃO ---
         lines_per_page = 8

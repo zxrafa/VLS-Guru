@@ -15,7 +15,7 @@ from database import (
     get_all_players, get_user_profile, save_user_profile,
     db_get_prefix, get_missions, get_all_users
 )
-from config import PLAYSTYLE_EMOJIS, POSITIONS_ALL, VLS_COINS_EMOJI, ALLOWED_ADMIN_IDS
+from config import PLAYSTYLE_EMOJIS, PLAYSTYLES_GK, POSITIONS_ALL, VLS_COINS_EMOJI, ALLOWED_ADMIN_IDS
 # Removido gerador automático de cartas
 import asyncio
 
@@ -565,7 +565,7 @@ async def finalizar_modal(interaction: discord.Interaction, pending: dict):
 class PlaystyleSelect(discord.ui.Select):
     def __init__(self, max_playstyles: int, is_gk: bool):
         options = []
-        gk_styles = ["arremesso_especial", "encaixada"]
+        gk_styles = PLAYSTYLES_GK
         for ps, emoji in PLAYSTYLE_EMOJIS.items():
             if is_gk and ps not in gk_styles:
                 continue
@@ -725,7 +725,7 @@ async def solicitar_foto_e_salvar(interaction: discord.Interaction, pending: dic
 class EditPlaystyleSelect(discord.ui.Select):
     def __init__(self, max_playstyles: int, is_gk: bool):
         options = []
-        gk_styles = ["arremesso_especial", "encaixada"]
+        gk_styles = PLAYSTYLES_GK
         for ps, emoji in PLAYSTYLE_EMOJIS.items():
             if is_gk and ps not in gk_styles:
                 continue
@@ -915,9 +915,9 @@ class EditarJogadorOpcoesView(discord.ui.View):
                 
                 def upload_imgbb():
                     try:
+                        import os, requests
                         from PIL import Image
                         from io import BytesIO
-                        import requests
                         img = Image.open(BytesIO(img_bytes)).convert("RGBA")
                         bbox = img.getbbox()
                         if bbox:
@@ -925,19 +925,38 @@ class EditarJogadorOpcoesView(discord.ui.View):
                         buf = BytesIO()
                         img.save(buf, format="PNG")
                         buf.seek(0)
+                        png_bytes = buf.read()
+                        
                         imgbb_key = os.getenv("IMGBB_API_KEY", "")
-                        resp = requests.post(
-                            f"https://api.imgbb.com/1/upload?key={imgbb_key}",
-                            files={"image": buf.read()},
-                            timeout=20
-                        )
-                        if resp.status_code == 200:
-                            return resp.json()["data"]["url"]
+                        if imgbb_key:
+                            try:
+                                resp = requests.post(
+                                    f"https://api.imgbb.com/1/upload?key={imgbb_key}",
+                                    files={"image": png_bytes},
+                                    timeout=15
+                                )
+                                if resp.status_code == 200:
+                                    return resp.json()["data"]["url"]
+                            except Exception as e:
+                                print(f"ImgBB error: {e}")
+                        
+                        # Catbox.moe fallback
+                        try:
+                            resp = requests.post(
+                                "https://catbox.moe/user/api.php",
+                                data={"reqtype": "fileupload"},
+                                files={"fileToUpload": ("card.png", png_bytes, "image/png")},
+                                timeout=15
+                            )
+                            if resp.status_code == 200 and resp.text.startswith("http"):
+                                return resp.text.strip()
+                        except Exception as e:
+                            print(f"Catbox error: {e}")
                     except Exception as e:
                         print(f"Erro no upload do anexo: {e}")
                     return ""
                 
-                progress_msg = await interaction.followup.send("⏳ Processando e hospedando imagem no ImgBB...", ephemeral=True)
+                progress_msg = await interaction.followup.send("⏳ Processando e hospedando imagem da carta...", ephemeral=True)
                 card_url = await asyncio.to_thread(upload_imgbb)
                 try:
                     await progress_msg.delete()
@@ -970,14 +989,14 @@ class EditarJogadorOpcoesView(discord.ui.View):
         if interaction.user.id != self.owner_id:
             return await interaction.response.send_message("❌ Acesso negado.", ephemeral=True)
             
-        await db_upsert(self.doc_id, self.player_data)
+        await _update_player_everywhere(self.doc_id, self.player_data)
         
         for child in self.children:
             child.disabled = True
             
         embed = discord.Embed(
             title="✅ Jogador Atualizado com Sucesso!",
-            description=f"Todas as modificações de atributos, PlayStyles e Foto foram salvas para **{self.player_data['name']}**.",
+            description=f"Todas as modificações de atributos, PlayStyles e Foto foram salvas para **{self.player_data['name']}** e sincronizadas com todos os inventários.",
             color=discord.Color.green()
         )
         await interaction.response.edit_message(embed=embed, view=self)
@@ -1032,7 +1051,7 @@ class PlayerSelectDropdown(discord.ui.Select):
                     "shoot": over, "pass_stat": over, "dribble": over, "defense": over, "physical": over
                 })
                 
-            await db_upsert(doc_id, data)
+            await _update_player_everywhere(doc_id, data)
             
             view = EditarJogadorOpcoesView(self.user_id, doc_id, data)
             embed = discord.Embed(
@@ -1182,6 +1201,44 @@ class EditarJogadorModal(VLSModal, title="Editar Jogador"):
                 color=discord.Color.orange()
             )
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def _update_player_everywhere(player_id: str, updated_card_data: dict):
+    """Atualiza o documento no catálogo Supabase E propaga foto, stats, OVR, nome e playstyles para todas as instâncias em inventários e escalações de usuários."""
+    db_id = player_id if player_id.startswith("player_") else f"player_{player_id}"
+    clean_id = player_id.replace("player_", "")
+
+    await db_upsert(db_id, updated_card_data)
+
+    users = await get_all_users()
+    sync_keys = [
+        "card", "name", "over", "pos", "pac", "sho", "pas", "dri", "def", "phy",
+        "div", "han", "kic", "ref", "spd", "pos_stat", "playstyles", "col_id",
+        "col_nome", "col_emoji", "weak_foot", "skill_moves", "original_pos"
+    ]
+
+    for u_data in users:
+        uid = u_data.get("user_id")
+        if not uid:
+            continue
+        modified = False
+
+        for item in u_data.get("inventory", []):
+            if item.get("id") == clean_id:
+                for k in sync_keys:
+                    if k in updated_card_data:
+                        item[k] = updated_card_data[k]
+                modified = True
+
+        for item in u_data.get("starting_xi", []):
+            if item.get("id") == clean_id:
+                for k in sync_keys:
+                    if k in updated_card_data:
+                        item[k] = updated_card_data[k]
+                modified = True
+
+        if modified:
+            await save_user_profile(uid, u_data)
 
 
 async def _delete_player_everywhere(player_id: str, player_name: str):

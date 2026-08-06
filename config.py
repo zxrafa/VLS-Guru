@@ -31,6 +31,9 @@ PLAYSTYLE_EMOJIS = {
     "espalmada": "<:Espalmada:1527128096631816257>",
 }
 
+PLAYSTYLES_GK = ["arremesso_especial", "encaixada", "soco", "espalmada"]
+PLAYSTYLES_FIELD = [ps for ps in PLAYSTYLE_EMOJIS if ps not in PLAYSTYLES_GK]
+
 # Ambientação & Emojis do Jogo
 EMOJI_ESTADIO = "🏟️"
 EMOJI_CLIMA_SOL = "☀️"

@@ -21,41 +21,17 @@ from config import VLS_COINS_EMOJI
 
 def calculate_player_price(player: dict, col_multipliers: dict) -> int:
     over = player.get("over", 75)
-    
-    fixed_prices = {
-        70: 5000,
-        71: 7500,
-        72: 10000,
-        73: 15000,
-        74: 20000,
-        75: 30000,
-        76: 40000,
-        77: 50000,
-        78: 120000,
-        79: 250000,
-        80: 600000,
-        81: 1300000,
-        82: 1900000,
-        83: 3000000,
-        84: 5000000,
-        85: 10000000,
-        86: 15000000,
-        87: 22000000,
-        88: 30000000,
-        89: 40000000,
-        90: 55000000,
-    }
+    base = max(5000, (over - 50) * 15000)
 
-    if over in fixed_prices:
-        base = fixed_prices[over]
+    # OVR >= 84 → +85% (carta boa vale mais)
+    if over >= 84:
+        base = base * 1.85
+    # OVR 80-83 → referência
+    elif 80 <= over <= 83:
+        base = base * 1.15
+    # OVR <= 79 → -60% (carta barata)
     else:
-        base = max(5000, (over - 50) * 15000)
-        if over >= 84:
-            base = base * 1.85
-        elif 80 <= over <= 83:
-            base = base * 1.15
-        else:
-            base = base * 0.40
+        base = base * 0.40
 
     col_id = player.get("col_id")
     col_pct = col_multipliers.get(col_id, 0)

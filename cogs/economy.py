@@ -25,29 +25,14 @@ VLS_COINS_EMOJI = '<:VLScoins:1517258837004914848>'
 
 async def calculate_price(player: dict) -> int:
     over = player.get("over", 75)
-    
-    fixed_prices = {
-        77: 50000,
-        78: 120000,
-        79: 250000,
-        80: 600000,
-        81: 1300000,
-        82: 1900000,
-        83: 3000000,
-        84: 5000000,
-        85: 10000000
-    }
+    base = max(5000, (over - 50) * 15000)
 
-    if over in fixed_prices:
-        base = fixed_prices[over]
+    if over >= 84:
+        base = base * 1.85
+    elif 80 <= over <= 83:
+        base = base * 1.15
     else:
-        base = max(5000, (over - 50) * 15000)
-        if over >= 84:
-            base = base * 1.85
-        elif 80 <= over <= 83:
-            base = base * 1.15
-        else:
-            base = base * 0.40
+        base = base * 0.40
 
     col_id = player.get("col_id")
     col_pct = 0
@@ -851,77 +836,6 @@ class EconomyCog(commands.Cog, name="Economia"):
         embed = discord.Embed(
             title="🔓 Evento Encerrado & Coleção Liberada!",
             description=f"A coleção **{nome_colecao}** foi liberada no sistema!\nAgora todos os jogadores podem encontrá-la nas caixas e no olheiro.",
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="admin_editar_jogador", description="ADM: Edita os atributos, OVR ou posição de um jogador no banco de dados.")
-    @app_commands.describe(
-        id_jogador="ID do jogador no banco (ex: player_lionel_messi_rw)",
-        over="Novo OVR (opcional)",
-        pac="Novo Ritmo / DIV (opcional)",
-        sho="Novo Chute / KIC (opcional)",
-        pas="Novo Passe / HAN (opcional)",
-        dri="Novo Drible / REF (opcional)",
-        def_stat="Nova Defesa / POS (opcional)",
-        phy="Novo Físico / SPD (opcional)",
-        pos="Nova Posição (opcional)"
-    )
-    async def admin_editar_jogador(
-        self,
-        interaction: discord.Interaction,
-        id_jogador: str,
-        over: int = None,
-        pac: int = None,
-        sho: int = None,
-        pas: int = None,
-        dri: int = None,
-        def_stat: int = None,
-        phy: int = None,
-        pos: str = None
-    ):
-        from config import ALLOWED_ADMIN_IDS
-        if interaction.user.id not in ALLOWED_ADMIN_IDS and not getattr(interaction.user.guild_permissions, "administrator", False):
-            return await interaction.response.send_message("❌ Apenas administradores podem editar atributos de jogadores.", ephemeral=True)
-
-        rec = await db_get(f"player_{id_jogador.strip()}")
-        if not rec:
-            return await interaction.response.send_message(f"❌ Carta `{id_jogador}` não foi encontrada no banco Supabase.", ephemeral=True)
-
-        card_data = rec["data"]
-        changes = []
-        if over is not None:
-            card_data["over"] = over
-            changes.append(f"OVR -> {over}")
-        if pac is not None:
-            card_data["pac"] = card_data["div"] = pac
-            changes.append(f"PAC -> {pac}")
-        if sho is not None:
-            card_data["sho"] = card_data["kic"] = sho
-            changes.append(f"SHO -> {sho}")
-        if pas is not None:
-            card_data["pas"] = card_data["han"] = pas
-            changes.append(f"PAS -> {pas}")
-        if dri is not None:
-            card_data["dri"] = card_data["ref"] = dri
-            changes.append(f"DRI -> {dri}")
-        if def_stat is not None:
-            card_data["def"] = card_data["pos_stat"] = def_stat
-            changes.append(f"DEF -> {def_stat}")
-        if phy is not None:
-            card_data["phy"] = card_data["spd"] = phy
-            changes.append(f"PHY -> {phy}")
-        if pos is not None:
-            card_data["pos"] = card_data["original_pos"] = pos.upper()
-            changes.append(f"POS -> {pos.upper()}")
-
-        if not changes:
-            return await interaction.response.send_message("⚠️ Nenhum atributo foi informado para alteração.", ephemeral=True)
-
-        await db_upsert(f"player_{id_jogador.strip()}", card_data)
-        embed = discord.Embed(
-            title="✏️ Carta de Jogador Editada com Sucesso!",
-            description=f"Atleta: **{card_data.get('name')}** (`{id_jogador}`)\n\n**Alterações aplicadas:**\n" + "\n".join([f"- `{c}`" for c in changes]),
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
